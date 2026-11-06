@@ -266,6 +266,26 @@ test_charted_rows_without_a_filed_date_follow_the_dated_rows_in_payload_order() 
   pass "charted rows with no filed date follow the dated rows in payload order"
 }
 
+test_each_summary_tile_scrolls_to_the_section_it_counts() {
+  local home out
+  home=$(make_home tile-targets)
+  out=$(render_board "$home" '[
+    {"id":"uw-1","repo":"sample","name":"Running work","state":"working","kind":"ship","doing":"building"}
+  ]' '[
+    {"id":"queued-one","repo":"sample","title":"Queued","reason":"","dispatchable":true}
+  ]')
+  printf '%s' "$out" | jq -e '
+    .error == ""
+      and ([.stats[] | {label, scrolls_to}] == [
+        {label:"need you", scrolls_to:["bb-sec-call"]},
+        {label:"underway", scrolls_to:["bb-sec-underway"]},
+        {label:"landed recently", scrolls_to:["bb-sec-landed"]},
+        {label:"charted next", scrolls_to:["bb-sec-charted"]}])
+      and all(.stats[]; .target_declared and .tag == "button" and .type == "button" and .prompts == 0)
+  ' >/dev/null || fail "a summary tile lost its section target or reached the agent: $out"
+  pass "each summary tile is a button that scrolls to its own declared section and queues nothing"
+}
+
 test_an_underway_row_leads_with_the_task_name_and_keeps_its_run_status
 test_an_underway_identifier_label_is_not_replaced_by_run_status
 test_charted_next_reads_newest_filed_first
@@ -275,3 +295,4 @@ test_warnings_are_excluded_from_the_charted_next_count
 test_a_board_of_only_warnings_still_reports_nothing_queued
 test_omitted_warnings_never_count_as_more_queued
 test_an_omitted_kind_keeps_the_existing_queued_rendering
+test_each_summary_tile_scrolls_to_the_section_it_counts
