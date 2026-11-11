@@ -13,7 +13,12 @@
 //     call:{wide:[page], narrow:[page], empty, details:[view]},
 //     row_links:[{row,label,shown,scrolls_to,prompts}],
 //     card_rows:[{card,underway,scrolls_to,prompts}],
-//     answers:[{key,found,prompts:[{text,tag,data}]}] }
+//     answers:[{key,found,prompts:[{text,tag,data}]}],
+//     dispatch:{hidden, displayed} }
+// dispatch is the Charted Next dispatch bar: its hidden attribute, and whether
+// it is displayed once the page's own stylesheet is applied to it. A hidden
+// element starts at the user-agent display:none, and any author rule that
+// matches it and sets display overrides that, as in a real browser.
 // row_links clicks each Underway row's card link and records the card then on
 // top of the stack; card_rows clicks each card's link back to its row.
 // where each Captain's Call page is {title, height, natural}: the card the back
@@ -114,6 +119,10 @@ class Node {
 // is visible as a scroll to an undeclared target.
 const declaredIds = new Set(
   [...html.split("<script")[0].matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
+// Ids whose static markup carries the hidden attribute.
+const staticHidden = new Set(
+  [...html.split("<script")[0].matchAll(/<[a-z]+\b[^>]*\sid="([^"]+)"[^>]*>/g)]
+    .filter((m) => /\shidden(\s|>|=)/.test(m[0])).map((m) => m[1]));
 const scrolls = [];
 const prompts = [];
 
@@ -132,6 +141,7 @@ globalThis.document = {
     if (!byId.has(id)) {
       const n = new Node("div");
       n.id = id;
+      n.hidden = staticHidden.has(id);
       new Node("div").appendChild(n);
       byId.set(id, n);
     }
@@ -408,7 +418,38 @@ const errorText = [...byId.entries()]
 const empty = ch.children.filter((c) => c.className.includes("bb-empty")).map((c) => c.textContent);
 const more = ch.children.filter((c) => c.className.includes("bb-morechip")).map((c) => c.textContent);
 
+// Toy cascade for display: author rules from the page's <style> whose
+// selector is a class or id, optionally followed by [hidden], matched against
+// one element; the most specific, then latest, display declaration wins over
+// the user-agent [hidden] { display: none }.
+const css = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]).join("\n")
+  .replace(/\/\*[\s\S]*?\*\//g, "");
+function displayed(node) {
+  let best = null;
+  let order = 0;
+  for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    order++;
+    const decl = m[2].match(/(?:^|;)\s*display\s*:\s*([^;]+)/);
+    if (!decl) continue;
+    for (const raw of m[1].split(",")) {
+      const sel = raw.trim().match(/^([.#])([\w-]+)(\[hidden\])?$/);
+      if (!sel) continue;
+      const hit = sel[1] === "#" ? node.id === sel[2] : node.className.split(/\s+/).includes(sel[2]);
+      if (!hit || (sel[3] && !node.hidden)) continue;
+      const spec = (sel[1] === "#" ? 100 : 10) + (sel[3] ? 10 : 0);
+      if (!best || spec > best.spec || (spec === best.spec && order >= best.order)) {
+        best = { spec, order, value: decl[1].trim() };
+      }
+    }
+  }
+  if (best) return best.value !== "none";
+  return !node.hidden;
+}
+const bar = byId.get("bb-dispatch") || new Node("div");
+if (!bar.className) bar.className = "bb-dispatch";
+const dispatch = { hidden: bar.hidden, displayed: displayed(bar) };
+
 process.stdout.write(
   JSON.stringify({ stats, captains_call, underway, charted, empty, more, error: errorText,
     call: { wide: callWide, narrow: callNarrow, empty: callEmpty, details },
-    row_links, card_rows, answers }) + "\n");
+    row_links, card_rows, answers, dispatch }) + "\n");

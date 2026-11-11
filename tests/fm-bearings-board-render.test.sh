@@ -308,6 +308,25 @@ test_warnings_are_excluded_from_the_charted_next_count() {
   pass "the charted next count counts queued work only, and still renders warnings"
 }
 
+test_the_dispatch_bar_shows_only_when_a_row_can_be_picked() {
+  local home out
+  home=$(make_home dispatch-none)
+  out=$(render "$home" '[
+    {"id":"wait-one","repo":"sample","title":"One","reason":"gated","dispatchable":false},
+    {"id":"wait-two","repo":"sample","title":"Two","reason":"blocked behind one","dispatchable":false}
+  ]')
+  printf '%s' "$out" | jq -e '.dispatch.hidden and (.dispatch.displayed | not)' >/dev/null \
+    || fail "the dispatch bar showed with no pickable row: $out"
+  home=$(make_home dispatch-one)
+  out=$(render "$home" '[
+    {"id":"wait-one","repo":"sample","title":"One","reason":"gated","dispatchable":false},
+    {"id":"ready-one","repo":"sample","title":"Ready","reason":"","dispatchable":true}
+  ]')
+  printf '%s' "$out" | jq -e '(.dispatch.hidden | not) and .dispatch.displayed' >/dev/null \
+    || fail "the dispatch bar stayed hidden with a pickable row: $out"
+  pass "the dispatch bar is not displayed until a Charted Next row can be picked"
+}
+
 test_a_board_of_only_warnings_still_reports_nothing_queued() {
   local home out
   home=$(make_home warning-only)
@@ -569,6 +588,7 @@ test_charted_rows_without_a_filed_date_follow_the_dated_rows_in_payload_order
 test_a_warning_row_reads_as_a_repair_not_as_queued_work
 test_warnings_are_excluded_from_the_charted_next_count
 test_a_board_of_only_warnings_still_reports_nothing_queued
+test_the_dispatch_bar_shows_only_when_a_row_can_be_picked
 test_omitted_warnings_never_count_as_more_queued
 test_an_omitted_kind_keeps_the_existing_queued_rendering
 test_each_summary_tile_scrolls_to_the_section_it_counts
