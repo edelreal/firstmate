@@ -1,0 +1,557 @@
+{
+ "tag": "head",
+ "errors": [],
+ "tiles": [
+  {
+   "tag": "button",
+   "type": "button",
+   "label": "need you",
+   "n": "3",
+   "scrollY": 123,
+   "navBottom": 65,
+   "atBottom": false,
+   "sectionUnderNav": [
+    "Captain's Call",
+    "Charted Next"
+   ],
+   "sectionTops": [
+    {
+     "heading": "Captain's Call",
+     "top": 65
+    },
+    {
+     "heading": "Charted Next",
+     "top": 65
+    },
+    {
+     "heading": "Underway",
+     "top": 771
+    },
+    {
+     "heading": "Recently Landed",
+     "top": 771
+    }
+   ],
+   "prompts": 0,
+   "hashChanged": false
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "label": "underway",
+   "n": "3",
+   "scrollY": 829,
+   "navBottom": 65,
+   "atBottom": false,
+   "sectionUnderNav": [
+    "Underway",
+    "Recently Landed"
+   ],
+   "sectionTops": [
+    {
+     "heading": "Captain's Call",
+     "top": -641
+    },
+    {
+     "heading": "Charted Next",
+     "top": -641
+    },
+    {
+     "heading": "Underway",
+     "top": 65
+    },
+    {
+     "heading": "Recently Landed",
+     "top": 65
+    }
+   ],
+   "prompts": 0,
+   "hashChanged": false
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "label": "landed recently",
+   "n": "14",
+   "scrollY": 829,
+   "navBottom": 65,
+   "atBottom": false,
+   "sectionUnderNav": [
+    "Underway",
+    "Recently Landed"
+   ],
+   "sectionTops": [
+    {
+     "heading": "Captain's Call",
+     "top": -641
+    },
+    {
+     "heading": "Charted Next",
+     "top": -641
+    },
+    {
+     "heading": "Underway",
+     "top": 65
+    },
+    {
+     "heading": "Recently Landed",
+     "top": 65
+    }
+   ],
+   "prompts": 0,
+   "hashChanged": false
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "label": "charted next",
+   "n": "3",
+   "scrollY": 123,
+   "navBottom": 65,
+   "atBottom": false,
+   "sectionUnderNav": [
+    "Captain's Call",
+    "Charted Next"
+   ],
+   "sectionTops": [
+    {
+     "heading": "Captain's Call",
+     "top": 65
+    },
+    {
+     "heading": "Charted Next",
+     "top": 65
+    },
+    {
+     "heading": "Underway",
+     "top": 771
+    },
+    {
+     "heading": "Recently Landed",
+     "top": 771
+    }
+   ],
+   "prompts": 0,
+   "hashChanged": false
+  }
+ ],
+ "tilesNarrow": [
+  {
+   "tag": "button",
+   "type": "button",
+   "label": "need you",
+   "n": "3",
+   "scrollY": 209,
+   "navBottom": 65,
+   "atBottom": false,
+   "sectionUnderNav": [
+    "Captain's Call"
+   ],
+   "sectionTops": [
+    {
+     "heading": "Captain's Call",
+     "top": 65
+    },
+    {
+     "heading": "Charted Next",
+     "top": 789
+    },
+    {
+     "heading": "Underway",
+     "top": 1077
+    },
+    {
+     "heading": "Recently Landed",
+     "top": 1307
+    }
+   ],
+   "prompts": 0,
+   "hashChanged": false
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "label": "underway",
+   "n": "3",
+   "scrollY": 1221,
+   "navBottom": 65,
+   "atBottom": false,
+   "sectionUnderNav": [
+    "Underway"
+   ],
+   "sectionTops": [
+    {
+     "heading": "Captain's Call",
+     "top": -947
+    },
+    {
+     "heading": "Charted Next",
+     "top": -223
+    },
+    {
+     "heading": "Underway",
+     "top": 65
+    },
+    {
+     "heading": "Recently Landed",
+     "top": 295
+    }
+   ],
+   "prompts": 0,
+   "hashChanged": false
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "label": "landed recently",
+   "n": "14",
+   "scrollY": 1451,
+   "navBottom": 65,
+   "atBottom": false,
+   "sectionUnderNav": [
+    "Recently Landed"
+   ],
+   "sectionTops": [
+    {
+     "heading": "Captain's Call",
+     "top": -1177
+    },
+    {
+     "heading": "Charted Next",
+     "top": -453
+    },
+    {
+     "heading": "Underway",
+     "top": -165
+    },
+    {
+     "heading": "Recently Landed",
+     "top": 65
+    }
+   ],
+   "prompts": 0,
+   "hashChanged": false
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "label": "charted next",
+   "n": "3",
+   "scrollY": 933,
+   "navBottom": 65,
+   "atBottom": false,
+   "sectionUnderNav": [
+    "Charted Next"
+   ],
+   "sectionTops": [
+    {
+     "heading": "Captain's Call",
+     "top": -659
+    },
+    {
+     "heading": "Charted Next",
+     "top": 65
+    },
+    {
+     "heading": "Underway",
+     "top": 353
+    },
+    {
+     "heading": "Recently Landed",
+     "top": 583
+    }
+   ],
+   "prompts": 0,
+   "hashChanged": false
+  }
+ ],
+ "cardsWide": [
+  {
+   "title": "Merge: short change",
+   "height": 604,
+   "natural": 224,
+   "stackNavTop": 838,
+   "underwayTop": 894,
+   "chartedTop": 188,
+   "count": "card 1 of 3"
+  },
+  {
+   "title": "Rollout scope for the staged migration",
+   "height": 604,
+   "natural": 604,
+   "stackNavTop": 838,
+   "underwayTop": 894,
+   "chartedTop": 188,
+   "count": "card 2 of 3"
+  },
+  {
+   "title": "Merge: medium change",
+   "height": 604,
+   "natural": 294,
+   "stackNavTop": 838,
+   "underwayTop": 894,
+   "chartedTop": 188,
+   "count": "card 3 of 3"
+  }
+ ],
+ "cardsNarrow": [
+  {
+   "title": "Merge: short change",
+   "height": 622,
+   "natural": 224,
+   "stackNavTop": 942,
+   "underwayTop": 1286,
+   "chartedTop": 998,
+   "count": "card 1 of 3"
+  },
+  {
+   "title": "Rollout scope for the staged migration",
+   "height": 622,
+   "natural": 621,
+   "stackNavTop": 942,
+   "underwayTop": 1286,
+   "chartedTop": 998,
+   "count": "card 2 of 3"
+  },
+  {
+   "title": "Merge: medium change",
+   "height": 622,
+   "natural": 294,
+   "stackNavTop": 942,
+   "underwayTop": 1286,
+   "chartedTop": 998,
+   "count": "card 3 of 3"
+  }
+ ],
+ "details": [
+  {
+   "btn": {
+    "text": "Details",
+    "type": "button",
+    "haspopup": "dialog",
+    "controls": "bb-modal"
+   },
+   "view": {
+    "visible": true,
+    "rect": {
+     "x": 0,
+     "y": 0,
+     "w": 1280,
+     "h": 720
+    },
+    "viewport": {
+     "w": 1280,
+     "h": 720
+    },
+    "title": "Merge: short change",
+    "meta": "checks greensample",
+    "sections": [
+     "Context",
+     "Options"
+    ],
+    "ctxRows": [
+     "risklow"
+    ],
+    "context": [],
+    "none": [
+     "No further context was recorded for this call."
+    ],
+    "options": [
+     {
+      "label": "Merge now",
+      "rec": false,
+      "hint": null,
+      "details": []
+     }
+    ],
+    "links": [
+     "https://github.com/example/sample/pull/7"
+    ],
+    "focus": "bb-modal-close",
+    "bodyLocked": "hidden",
+    "pageInert": true,
+    "scrollable": false,
+    "scrollHeight": 629,
+    "clientHeight": 629
+   },
+   "scrolled": null,
+   "tabInside": true,
+   "closedBy": "Escape",
+   "after": {
+    "hidden": true,
+    "focusIsDetails": true,
+    "inert": false,
+    "bodyOverflow": "visible"
+   },
+   "prompts": 0
+  },
+  {
+   "btn": {
+    "text": "Details",
+    "type": "button",
+    "haspopup": "dialog",
+    "controls": "bb-modal"
+   },
+   "view": {
+    "visible": true,
+    "rect": {
+     "x": 0,
+     "y": 0,
+     "w": 1280,
+     "h": 720
+    },
+    "viewport": {
+     "w": 1280,
+     "h": 720
+    },
+    "title": "Rollout scope for the staged migration",
+    "meta": "decisionsample",
+    "sections": [
+     "Context",
+     "Options"
+    ],
+    "ctxRows": [
+     "aboutThe migration touches three services and the current workflow keeps a fallback route that costs a second deploy per release; this card carries a long about line so it wraps across several lines.",
+     "decideWhich route should proceed, given the tradeoffs each option names in its hint and the review still outstanding on the fallback path?"
+    ],
+    "context": [
+     "The staged verification has passed on two of three services. The third (billing) still reports a flaky integration check; see https://github.com/example/sample/pull/42 for the run.",
+     "Background reading: https://en.wikipedia.org/wiki/Blue-green_deployment_(software) explains the fallback pattern. A code span `https://github.com/o/r/pull/1` and **https://example.com/y** must link without their markers.",
+     "Paragraph three exists to make the Details view long enough to scroll. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+     "Paragraph four: Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
+     "A javascript:alert(1) string stays text, and so does http://insecure.example.com."
+    ],
+    "none": [],
+    "options": [
+     {
+      "label": "Retain the workflow",
+      "rec": true,
+      "hint": "Keeps the fallback route; one more deploy per release",
+      "details": [
+       "Keeps every current integration until each dependency reports its result.",
+       "Costs a second deploy per release until the billing check is fixed.",
+       "Risk: low. Reversible at any time."
+      ]
+     },
+     {
+      "label": "Defer the migration",
+      "rec": false,
+      "hint": "Waits for the remaining review",
+      "details": [
+       "Holds the migration until the outstanding review on the fallback path finishes.",
+       "Nothing ships to billing in the meantime; the other two services keep the new route."
+      ]
+     },
+     {
+      "label": "Abandon the migration",
+      "rec": false,
+      "hint": null,
+      "details": []
+     },
+     {
+      "label": "Reconcile",
+      "rec": false,
+      "hint": "Re-check the latest state, then close this with evidence or keep it open with a note",
+      "details": []
+     }
+    ],
+    "links": [
+     "https://github.com/example/sample/pull/42",
+     "https://en.wikipedia.org/wiki/Blue-green_deployment_(software)",
+     "https://github.com/o/r/pull/1",
+     "https://example.com/y"
+    ],
+    "focus": "bb-modal-close",
+    "bodyLocked": "hidden",
+    "pageInert": true,
+    "scrollable": true,
+    "scrollHeight": 1120,
+    "clientHeight": 629
+   },
+   "scrolled": {
+    "scrollTop": 491,
+    "pageScrollY": 426
+   },
+   "tabInside": true,
+   "closedBy": "Close",
+   "after": {
+    "hidden": true,
+    "focusIsDetails": true,
+    "inert": false,
+    "bodyOverflow": "visible"
+   },
+   "prompts": 0
+  },
+  {
+   "btn": {
+    "text": "Details",
+    "type": "button",
+    "haspopup": "dialog",
+    "controls": "bb-modal"
+   },
+   "view": {
+    "visible": true,
+    "rect": {
+     "x": 0,
+     "y": 0,
+     "w": 1280,
+     "h": 720
+    },
+    "viewport": {
+     "w": 1280,
+     "h": 720
+    },
+    "title": "Merge: medium change",
+    "meta": "checks greensample",
+    "sections": [
+     "Context",
+     "Options"
+    ],
+    "ctxRows": [
+     "riskhigh"
+    ],
+    "context": [],
+    "none": [
+     "No further context was recorded for this call."
+    ],
+    "options": [
+     {
+      "label": "Merge now",
+      "rec": false,
+      "hint": null,
+      "details": []
+     },
+     {
+      "label": "Not yet",
+      "rec": false,
+      "hint": null,
+      "details": []
+     }
+    ],
+    "links": [
+     "https://example.com/run/9"
+    ],
+    "focus": "bb-modal-close",
+    "bodyLocked": "hidden",
+    "pageInert": true,
+    "scrollable": false,
+    "scrollHeight": 629,
+    "clientHeight": 629
+   },
+   "scrolled": null,
+   "tabInside": true,
+   "closedBy": "Close",
+   "after": {
+    "hidden": true,
+    "focusIsDetails": true,
+    "inert": false,
+    "bodyOverflow": "visible"
+   },
+   "prompts": 0
+  }
+ ],
+ "answer": {
+  "queued": 1,
+  "prompt": "Captain's Call answer - Rollout scope for the staged migration: retain"
+ }
+}

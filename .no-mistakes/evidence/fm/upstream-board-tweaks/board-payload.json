@@ -1,0 +1,224 @@
+{
+  "schema": "fm-bearings-board.v1",
+  "home": "lab-home",
+  "generated": "2026-11-11T00:00Z",
+  "prs_live": false,
+  "captains_call": [
+    {
+      "key": "merge.short",
+      "type": "merge",
+      "repo": "sample",
+      "title": "Merge: short change",
+      "risk": "low",
+      "task_id": "short-task",
+      "pr_url": "https://github.com/example/sample/pull/7",
+      "checks": "green",
+      "options": [
+        {
+          "value": "merge",
+          "label": "Merge now"
+        }
+      ]
+    },
+    {
+      "key": "rollout-scope",
+      "type": "decision",
+      "repo": "sample",
+      "title": "Rollout scope for the staged migration",
+      "about": "The migration touches three services and the current workflow keeps a fallback route that costs a second deploy per release; this card carries a long about line so it wraps across several lines.",
+      "decide": "Which route should proceed, given the tradeoffs each option names in its hint and the review still outstanding on the fallback path?",
+      "context": [
+        "The staged verification has passed on two of three services. The third (billing) still reports a flaky integration check; see https://github.com/example/sample/pull/42 for the run.",
+        "Background reading: https://en.wikipedia.org/wiki/Blue-green_deployment_(software) explains the fallback pattern. A code span `https://github.com/o/r/pull/1` and **https://example.com/y** must link without their markers.",
+        "Paragraph three exists to make the Details view long enough to scroll. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+        "Paragraph four: Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
+        "A javascript:alert(1) string stays text, and so does http://insecure.example.com."
+      ],
+      "options": [
+        {
+          "value": "retain",
+          "label": "Retain the workflow",
+          "hint": "Keeps the fallback route; one more deploy per release",
+          "details": [
+            "Keeps every current integration until each dependency reports its result.",
+            "Costs a second deploy per release until the billing check is fixed.",
+            "Risk: low. Reversible at any time."
+          ]
+        },
+        {
+          "value": "defer",
+          "label": "Defer the migration",
+          "hint": "Waits for the remaining review",
+          "details": [
+            "Holds the migration until the outstanding review on the fallback path finishes.",
+            "Nothing ships to billing in the meantime; the other two services keep the new route."
+          ]
+        },
+        {
+          "value": "abandon",
+          "label": "Abandon the migration"
+        }
+      ],
+      "recommend_value": "retain",
+      "allow_freeform": true
+    },
+    {
+      "key": "merge.medium",
+      "type": "merge",
+      "repo": "sample",
+      "title": "Merge: medium change",
+      "risk": "high",
+      "detail": "A detail line of moderate length that wraps once or twice, with a link https://example.com/run/9.",
+      "options": [
+        {
+          "value": "merge",
+          "label": "Merge now"
+        },
+        {
+          "value": "hold",
+          "label": "Not yet"
+        }
+      ]
+    }
+  ],
+  "underway": [
+    {
+      "id": "uw-1",
+      "repo": "sample",
+      "name": "Running work one",
+      "state": "working",
+      "kind": "ship",
+      "doing": "building"
+    },
+    {
+      "id": "uw-2",
+      "repo": "sample",
+      "name": "Running work two",
+      "state": "working",
+      "kind": "scout",
+      "doing": "reading"
+    },
+    {
+      "id": "uw-3",
+      "repo": "sample",
+      "name": "Running work three",
+      "state": "working",
+      "kind": "ship",
+      "doing": "testing"
+    }
+  ],
+  "landed": [
+    {
+      "id": "l-1",
+      "repo": "sample",
+      "what": "Landed change 1",
+      "owner": "ship-1"
+    },
+    {
+      "id": "l-2",
+      "repo": "sample",
+      "what": "Landed change 2",
+      "owner": "ship-2"
+    },
+    {
+      "id": "l-3",
+      "repo": "sample",
+      "what": "Landed change 3",
+      "owner": "ship-3"
+    },
+    {
+      "id": "l-4",
+      "repo": "sample",
+      "what": "Landed change 4",
+      "owner": "ship-4"
+    },
+    {
+      "id": "l-5",
+      "repo": "sample",
+      "what": "Landed change 5",
+      "owner": "ship-5"
+    },
+    {
+      "id": "l-6",
+      "repo": "sample",
+      "what": "Landed change 6",
+      "owner": "ship-6"
+    },
+    {
+      "id": "l-7",
+      "repo": "sample",
+      "what": "Landed change 7",
+      "owner": "ship-7"
+    },
+    {
+      "id": "l-8",
+      "repo": "sample",
+      "what": "Landed change 8",
+      "owner": "ship-8"
+    },
+    {
+      "id": "l-9",
+      "repo": "sample",
+      "what": "Landed change 9",
+      "owner": "ship-9"
+    },
+    {
+      "id": "l-10",
+      "repo": "sample",
+      "what": "Landed change 10",
+      "owner": "ship-10"
+    },
+    {
+      "id": "l-11",
+      "repo": "sample",
+      "what": "Landed change 11",
+      "owner": "ship-11"
+    },
+    {
+      "id": "l-12",
+      "repo": "sample",
+      "what": "Landed change 12",
+      "owner": "ship-12"
+    },
+    {
+      "id": "l-13",
+      "repo": "sample",
+      "what": "Landed change 13",
+      "owner": "ship-13"
+    },
+    {
+      "id": "l-14",
+      "repo": "sample",
+      "what": "Landed change 14",
+      "owner": "ship-14"
+    }
+  ],
+  "charted": [
+    {
+      "id": "q-1",
+      "repo": "sample",
+      "title": "Queued item one",
+      "reason": "queued",
+      "dispatchable": true,
+      "filed": "2026-11-01"
+    },
+    {
+      "id": "q-2",
+      "repo": "sample",
+      "title": "Queued item two",
+      "reason": "queued",
+      "dispatchable": true,
+      "filed": "2026-11-02"
+    },
+    {
+      "id": "q-3",
+      "repo": "sample",
+      "title": "Queued item three",
+      "reason": "queued",
+      "dispatchable": true,
+      "filed": "2026-11-03"
+    }
+  ],
+  "charted_more": 0,
+  "charted_warning_more": 0
+}

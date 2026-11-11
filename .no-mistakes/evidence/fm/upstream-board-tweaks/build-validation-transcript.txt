@@ -1,0 +1,49 @@
+$ build with captains_call[1].context = "a bare string"
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-bb-live/scripts/bad.json
+build-exit: 1
+(exit 1; board published: no)
+
+$ build with captains_call[1].context = []
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-bb-live/scripts/bad.json
+build-exit: 1
+(exit 1; board published: no)
+
+$ build with captains_call[1].context = [""]
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-bb-live/scripts/bad.json
+build-exit: 1
+(exit 1; board published: no)
+
+$ build with captains_call[1].context = ["ok", 3]
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-bb-live/scripts/bad.json
+build-exit: 1
+(exit 1; board published: no)
+
+$ build with captains_call[1].options[0].details = "a bare string"
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-bb-live/scripts/bad.json
+build-exit: 1
+(exit 1; board published: no)
+
+$ build with captains_call[1].options[0].details = []
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-bb-live/scripts/bad.json
+build-exit: 1
+(exit 1; board published: no)
+
+$ build with captains_call[1].options[0].details = [""]
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-bb-live/scripts/bad.json
+build-exit: 1
+(exit 1; board published: no)
+
+$ build with captains_call[1].options[0].details = ["ok", 3]
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-bb-live/scripts/bad.json
+build-exit: 1
+(exit 1; board published: no)
+
+$ build with the valid payload (context + details present)
+board: /tmp/fm-bb-live.mABBRM/home/.lavish/bearings-board.html
+session:
+  status: opened
+session: live
+served: /tmp/fm-bb-live.mABBRM/home/.lavish/bearings-board.html
+bound: lavish-d1319bec1c649e3b
+armed: lavish-d1319bec1c649e3b
+build-exit: 0

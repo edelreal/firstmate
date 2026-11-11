@@ -1,0 +1,33 @@
+{
+ "tag": "base",
+ "errors": [],
+ "cardsWide": [
+  {
+   "title": "Merge: short change",
+   "height": 224,
+   "natural": 224,
+   "stackNavTop": 458,
+   "underwayTop": 514,
+   "chartedTop": 188,
+   "count": "card 1 of 3"
+  },
+  {
+   "title": "Rollout scope for the staged migration",
+   "height": 604,
+   "natural": 604,
+   "stackNavTop": 838,
+   "underwayTop": 894,
+   "chartedTop": 188,
+   "count": "card 2 of 3"
+  },
+  {
+   "title": "Merge: medium change",
+   "height": 294,
+   "natural": 294,
+   "stackNavTop": 528,
+   "underwayTop": 584,
+   "chartedTop": 188,
+   "count": "card 3 of 3"
+  }
+ ]
+}
