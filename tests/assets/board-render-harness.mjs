@@ -5,7 +5,7 @@
 // Usage: node board-render-harness.mjs <built-board.html>
 // Prints one JSON document:
 //   { stats:[{n,label,tag,type,scrolls_to,target_declared,prompts}],
-//     underway:[{title,sub,badges}],
+//     captains_call:[text], underway:[{title,sub,badges}],
 //     charted:[{title,sub,badges,pickable}], empty, more, error,
 //     call:{wide:[page], narrow:[page], empty, details:[view]} }
 // where each Captain's Call page is {title, height, natural}: the card the back
@@ -48,7 +48,11 @@ class Node {
     this.classList = {
       add: (c) => { if (!has(c)) this.className = (this.className + " " + c).trim(); },
       remove,
-      toggle: (c, on) => { if (on ?? !has(c)) this.classList.add(c); else remove(c); },
+      toggle: (c, force) => {
+        const enabled = force ?? !has(c);
+        if (enabled) this.classList.add(c); else remove(c);
+        return enabled;
+      },
       contains: has,
     };
   }
@@ -255,6 +259,9 @@ const rowsOf = (container) =>
 
 const uw = byId.get("bb-underway") || new Node("div");
 const underway = rowsOf(uw);
+const captains_call = (byId.get("bb-call") || new Node("div")).children
+  .filter((n) => n.className.split(/\s+/).includes("bb-decision"))
+  .map((n) => n.textContent);
 
 const ch = byId.get("bb-charted") || new Node("div");
 const charted = rowsOf(ch);
@@ -268,5 +275,5 @@ const empty = ch.children.filter((c) => c.className.includes("bb-empty")).map((c
 const more = ch.children.filter((c) => c.className.includes("bb-morechip")).map((c) => c.textContent);
 
 process.stdout.write(
-  JSON.stringify({ stats, underway, charted, empty, more, error: errorText,
+  JSON.stringify({ stats, captains_call, underway, charted, empty, more, error: errorText,
     call: { wide: callWide, narrow: callNarrow, empty: callEmpty, details } }) + "\n");
