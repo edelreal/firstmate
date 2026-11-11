@@ -1,49 +1,29 @@
-$ build with captains_call[1].context = "a bare string"
-fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-bb-live/scripts/bad.json
-build-exit: 1
-(exit 1; board published: no)
+$ fm-bearings-board.sh build board.json   # valid payload with context + option details (lavish-axi kept off PATH)
+board: $LAB/.lavish/bearings-board.html
+fm-bearings-board: lavish-axi is not installed
+exit=1
 
-$ build with captains_call[1].context = []
-fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-bb-live/scripts/bad.json
-build-exit: 1
-(exit 1; board published: no)
+$ fm-bearings-board.sh build bad.json   # empty context array
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: $LAB/bad.json
+exit=1
+existing board untouched: yes
 
-$ build with captains_call[1].context = [""]
-fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-bb-live/scripts/bad.json
-build-exit: 1
-(exit 1; board published: no)
+$ fm-bearings-board.sh build bad.json   # context paragraph empty string
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: $LAB/bad.json
+exit=1
+existing board untouched: yes
 
-$ build with captains_call[1].context = ["ok", 3]
-fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-bb-live/scripts/bad.json
-build-exit: 1
-(exit 1; board published: no)
+$ fm-bearings-board.sh build bad.json   # context as a bare string
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: $LAB/bad.json
+exit=1
+existing board untouched: yes
 
-$ build with captains_call[1].options[0].details = "a bare string"
-fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-bb-live/scripts/bad.json
-build-exit: 1
-(exit 1; board published: no)
+$ fm-bearings-board.sh build bad.json   # option details empty array
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: $LAB/bad.json
+exit=1
+existing board untouched: yes
 
-$ build with captains_call[1].options[0].details = []
-fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-bb-live/scripts/bad.json
-build-exit: 1
-(exit 1; board published: no)
-
-$ build with captains_call[1].options[0].details = [""]
-fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-bb-live/scripts/bad.json
-build-exit: 1
-(exit 1; board published: no)
-
-$ build with captains_call[1].options[0].details = ["ok", 3]
-fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /tmp/fm-bb-live/scripts/bad.json
-build-exit: 1
-(exit 1; board published: no)
-
-$ build with the valid payload (context + details present)
-board: /tmp/fm-bb-live.mABBRM/home/.lavish/bearings-board.html
-session:
-  status: opened
-session: live
-served: /tmp/fm-bb-live.mABBRM/home/.lavish/bearings-board.html
-bound: lavish-d1319bec1c649e3b
-armed: lavish-d1319bec1c649e3b
-build-exit: 0
+$ fm-bearings-board.sh build bad.json   # option details with a number
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: $LAB/bad.json
+exit=1
+existing board untouched: yes

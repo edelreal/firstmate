@@ -1,0 +1,85 @@
+{
+  "schema": "fm-bearings-board.v1",
+  "home": "lab-home",
+  "generated": "2026-11-11T12:00:00Z",
+  "prs_live": false,
+  "captains_call": [
+    {
+      "key": "short-call", "type": "decision", "repo": "acme/widgets",
+      "title": "Rename the widgets CLI flag?",
+      "about": "One flag.",
+      "options": [
+        {"value": "yes", "label": "Rename it"},
+        {"value": "no", "label": "Keep it"}
+      ],
+      "recommend_value": "yes"
+    },
+    {
+      "key": "tall-call", "type": "decision", "repo": "acme/widgets",
+      "title": "Which cache backend should the widgets service adopt for the next release?",
+      "about": "The widgets service currently uses an in-process LRU cache that loses every entry on restart, which makes the first minutes after each deploy slow for every tenant.",
+      "decide": "Pick the backend the service will adopt; the migration plan follows from this choice.",
+      "detail": "Benchmarks live at https://example.com/bench/cache-2026. See also `https://github.com/acme/widgets/pull/42`. and **https://example.com/x**",
+      "context": [
+        "Restart loss costs roughly 4 minutes of cold-cache latency per deploy, measured over the last 30 deploys.",
+        "Background reading: https://en.wikipedia.org/wiki/Cache_(computing) explains the trade-offs.",
+        "Operations has asked that any new dependency be one the on-call rotation already runs."
+      ],
+      "options": [
+        {"value": "redis", "label": "Redis", "hint": "Shared cache, survives restarts", "details": ["On-call already runs Redis for sessions.", "Adds a network hop per lookup; p99 rises by about 0.4 ms."]},
+        {"value": "memcached", "label": "Memcached", "hint": "Simple, fast, no persistence", "details": ["Nobody on-call runs it today."]},
+        {"value": "disk", "label": "Local disk snapshot", "hint": "Persist the LRU to disk on shutdown", "details": ["No new dependency.", "Snapshot load adds 20 s to startup."]},
+        {"value": "defer", "label": "Defer to next quarter", "hint": "Keep the in-process cache for now"}
+      ],
+      "recommend_value": "redis",
+      "allow_freeform": true
+    },
+    {
+      "key": "merge-42", "type": "merge", "repo": "acme/widgets",
+      "title": "Merge acme/widgets#42 - cache warmup on boot",
+      "risk": "low",
+      "pr_url": "https://github.com/acme/widgets/pull/42",
+      "detail": "Checks green on head abc1234.",
+      "options": [
+        {"value": "merge", "label": "Merge", "hint": "Squash-merge now"},
+        {"value": "hold", "label": "Hold"}
+      ],
+      "recommend_value": "merge"
+    },
+    {
+      "key": "cred-call", "type": "credential", "repo": "acme/infra",
+      "title": "Provide the deploy token for the staging cluster so the release pipeline can push images, rotate the expiring service account, re-run the failed deploy job from this morning, confirm the image digests match what was built, and then notify the release channel that staging is unblocked again for every team that depends on it today",
+      "about": "The staging deploy token expired overnight.",
+      "context": [
+        "Paragraph 1. The staging deploy token expired overnight and the release pipeline cannot push images until a fresh one is provided by someone with cluster-admin access.",
+        "Paragraph 2. The pipeline retries every fifteen minutes; each failed attempt is logged but no alert fires because the failure class is classified as transient by the current alerting policy.",
+        "Paragraph 3. Rotation of the service account is a separate, slower process owned by the platform team; this call only needs the short-lived token.",
+        "Paragraph 4. Once the token lands, the queued deploys drain in order; no manual re-run is needed for any of them except the one that failed this morning.",
+        "Paragraph 5. The failed deploy from this morning needs a manual re-run because its job was cancelled by the scheduler after the third retry.",
+        "Paragraph 6. Image digests are verified automatically by the deploy job; a mismatch fails the job closed rather than deploying a different build.",
+        "Paragraph 7. The release channel is notified automatically when the pipeline turns green again.",
+        "Paragraph 8. Teams blocked today: payments, search, notifications, and the internal tools group.",
+        "Paragraph 9. If the token cannot be provided today, the fallback is to deploy from a workstation, which the security policy discourages.",
+        "Paragraph 10. LAST PARAGRAPH MARKER - reaching this paragraph proves the body scrolled to its end."
+      ],
+      "options": [
+        {"value": "provided", "label": "Token provided", "hint": "Pasted into the secret store", "details": ["The pipeline picks it up on the next retry."]},
+        {"value": "later", "label": "Later today", "hint": "Not yet available"}
+      ]
+    }
+  ],
+  "underway": [
+    {"repo": "acme/widgets", "name": "cache-warmup", "id": "t-1", "state": "running", "doing": "writing tests", "kind": "ship"},
+    {"repo": "acme/infra", "name": "token-rotation", "id": "t-2", "state": "running", "doing": "drafting plan", "kind": "scout"},
+    {"repo": "acme/widgets", "name": "flag-audit", "id": "t-3", "state": "waiting", "doing": "awaiting review", "kind": "ship"}
+  ],
+  "landed": [
+    {"repo": "acme/widgets", "id": "t-0", "what": "Fix flaky widget test", "owner": "mate-1", "pr_url": "https://github.com/acme/widgets/pull/40"},
+    {"repo": "acme/infra", "id": "t-9", "what": "Bump base image", "owner": "mate-2"}
+  ],
+  "charted": [
+    {"repo": "acme/widgets", "id": "c-1", "title": "Split the widgets monolith", "reason": "scaling", "dispatchable": true, "filed": "2026-11-01"},
+    {"repo": "acme/widgets", "id": "c-2", "title": "Add tracing", "reason": "observability", "dispatchable": true, "filed": "2026-11-05"},
+    {"repo": "acme/infra", "id": "c-3", "title": "Terraform drift check", "reason": "hygiene", "dispatchable": false}
+  ]
+}

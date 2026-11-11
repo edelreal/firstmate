@@ -1,0 +1,392 @@
+[
+  {
+    "scn": "S2 tile \"need you\" -> Captain's Call",
+    "ok": true,
+    "info": {
+      "tag": "BUTTON",
+      "num": "4",
+      "navBottom": 65,
+      "sectionTop": 65,
+      "scrollY": 123,
+      "atMaxScroll": false,
+      "queued": 0,
+      "hashChanged": false
+    }
+  },
+  {
+    "scn": "S2 tile \"underway\" -> Underway",
+    "ok": true,
+    "info": {
+      "tag": "BUTTON",
+      "num": "3",
+      "navBottom": 65,
+      "sectionTop": 382,
+      "scrollY": 577,
+      "atMaxScroll": true,
+      "queued": 0,
+      "hashChanged": false
+    }
+  },
+  {
+    "scn": "S2 tile \"landed recently\" -> Recently Landed",
+    "ok": true,
+    "info": {
+      "tag": "BUTTON",
+      "num": "2",
+      "navBottom": 65,
+      "sectionTop": 382,
+      "scrollY": 577,
+      "atMaxScroll": true,
+      "queued": 0,
+      "hashChanged": false
+    }
+  },
+  {
+    "scn": "S2 tile \"charted next\" -> Charted Next",
+    "ok": true,
+    "info": {
+      "tag": "BUTTON",
+      "num": "3",
+      "navBottom": 65,
+      "sectionTop": 65,
+      "scrollY": 123,
+      "atMaxScroll": false,
+      "queued": 0,
+      "hashChanged": false
+    }
+  },
+  {
+    "scn": "S2 no page errors",
+    "ok": true,
+    "info": []
+  },
+  {
+    "scn": "S3 every card same height; content below never moves while paging",
+    "ok": true,
+    "info": [
+      {
+        "title": "Rename the widgets CLI flag?",
+        "cardH": 669,
+        "underwayTop": 959,
+        "count": "card 1 of 4",
+        "docH": 1297
+      },
+      {
+        "title": "Which cache backend should the widgets s",
+        "cardH": 669,
+        "underwayTop": 959,
+        "count": "card 2 of 4",
+        "docH": 1297
+      },
+      {
+        "title": "Merge acme/widgets#42 - cache warmup on ",
+        "cardH": 669,
+        "underwayTop": 959,
+        "count": "card 3 of 4",
+        "docH": 1297
+      },
+      {
+        "title": "Provide the deploy token for the staging",
+        "cardH": 669,
+        "underwayTop": 959,
+        "count": "card 4 of 4",
+        "docH": 1297
+      }
+    ]
+  },
+  {
+    "scn": "S3b after resize to 900px wide, paging back still keeps one height",
+    "ok": true,
+    "info": [
+      {
+        "cardH": 604,
+        "underwayTop": 1183
+      },
+      {
+        "cardH": 604,
+        "underwayTop": 1183
+      },
+      {
+        "cardH": 604,
+        "underwayTop": 1183
+      },
+      {
+        "cardH": 604,
+        "underwayTop": 1183
+      }
+    ]
+  },
+  {
+    "scn": "S3 no page errors",
+    "ok": true,
+    "info": []
+  },
+  {
+    "scn": "S4 Details opens a full-screen view focused on Close, page behind inert",
+    "ok": true,
+    "info": {
+      "rect": [
+        0,
+        0,
+        1280,
+        800
+      ],
+      "active": "bb-modal-close",
+      "mainInert": true,
+      "title": "Which cache backend should the widgets service adopt for the next release?",
+      "meta": "decisionacme/widgets"
+    }
+  },
+  {
+    "scn": "S4 view shows context paragraphs and every option with hint and details",
+    "ok": true,
+    "info": {
+      "sections": [
+        "Context",
+        "Options"
+      ],
+      "ctxParas": 3,
+      "options": [
+        {
+          "label": "Redis",
+          "rec": true,
+          "hint": "Shared cache, survives restarts",
+          "details": [
+            "On-call already runs Redis for sessions.",
+            "Adds a network hop per lookup; p99 rises by about 0.4 ms."
+          ]
+        },
+        {
+          "label": "Memcached",
+          "rec": false,
+          "hint": "Simple, fast, no persistence",
+          "details": [
+            "Nobody on-call runs it today."
+          ]
+        },
+        {
+          "label": "Local disk snapshot",
+          "rec": false,
+          "hint": "Persist the LRU to disk on shutdown",
+          "details": [
+            "No new dependency.",
+            "Snapshot load adds 20 s to startup."
+          ]
+        },
+        {
+          "label": "Defer to next quarter",
+          "rec": false,
+          "hint": "Keep the in-process cache for now",
+          "details": []
+        },
+        {
+          "label": "Reconcile",
+          "rec": false,
+          "hint": "Re-check the latest state, then close this with evidence or keep it open with a note",
+          "details": []
+        }
+      ]
+    }
+  },
+  {
+    "scn": "S8 https links in context/detail resolve without trailing punctuation, backticks or ** markers; parens kept",
+    "ok": true,
+    "info": [
+      {
+        "text": "https://example.com/bench/cache-2026",
+        "href": "https://example.com/bench/cache-2026"
+      },
+      {
+        "text": "https://github.com/acme/widgets/pull/42",
+        "href": "https://github.com/acme/widgets/pull/42"
+      },
+      {
+        "text": "https://example.com/x",
+        "href": "https://example.com/x"
+      },
+      {
+        "text": "https://en.wikipedia.org/wiki/Cache_(computing)",
+        "href": "https://en.wikipedia.org/wiki/Cache_(computing)"
+      }
+    ]
+  },
+  {
+    "scn": "S4 body scrolls inside the view (page behind does not)",
+    "ok": true,
+    "info": {
+      "scrollable": true,
+      "scrollTop": 378,
+      "max": 378,
+      "winY": 497,
+      "winY0": 497
+    }
+  },
+  {
+    "scn": "S4 Escape closes, focus back on the card Details button, nothing queued",
+    "ok": true,
+    "info": {
+      "hidden": true,
+      "active": "Details",
+      "activeInVisibleCard": true,
+      "mainInert": false,
+      "queued": 0
+    }
+  },
+  {
+    "scn": "S4 merge card view shows risk and PR link; Close button closes it",
+    "ok": true,
+    "info": {
+      "mergeView": {
+        "meta": "checks greenacme/widgets",
+        "links": [
+          "https://github.com/acme/widgets/pull/42"
+        ],
+        "body": "CONTEXT\nRISK\nlow\n\nChecks green on head abc1234.\n\nhttps://github.com/acme/widgets/pull/42\n\nNo further context was recorded for this call.\n\nOPTIONS\nMerge\nREC\n\nSquash-merge now\n\nHold"
+      },
+      "afterClose": {
+        "hidden": true,
+        "active": "Details",
+        "queued": 0
+      }
+    }
+  },
+  {
+    "scn": "S4 no page errors",
+    "ok": true,
+    "info": []
+  },
+  {
+    "scn": "S5 long title capped at 40vh; Close in view; body keeps room",
+    "ok": true,
+    "info": {
+      "vh": 640,
+      "headingH": 198,
+      "closeTop": 16,
+      "closeBottom": 49,
+      "bodyTop": 231,
+      "bodyH": 409,
+      "links": 0,
+      "active": "bb-modal-close"
+    }
+  },
+  {
+    "scn": "S5 Tab cycles Close -> body -> heading -> Close, never leaves the view (no links)",
+    "ok": true,
+    "info": [
+      "bb-modal-close",
+      "bb-modal-scroll",
+      "bb-modal__heading",
+      "bb-modal-close",
+      "bb-modal-scroll",
+      "S-Tab:bb-modal-close"
+    ]
+  },
+  {
+    "scn": "S5 keyboard scrolls the body (PageDown, End) to the last paragraph",
+    "ok": true,
+    "info": {
+      "before": 0,
+      "afterPD": 357,
+      "scrollTop": 526,
+      "max": 526,
+      "lastParaVisible": true
+    }
+  },
+  {
+    "scn": "S5 no page errors",
+    "ok": true,
+    "info": []
+  },
+  {
+    "scn": "S6 at 320px every card keeps Details inside the card, before and after queueing",
+    "ok": true,
+    "info": {
+      "perCard": [
+        {
+          "inside": true,
+          "card": [
+            28,
+            292
+          ],
+          "details": [
+            191,
+            270
+          ]
+        },
+        {
+          "inside": true,
+          "card": [
+            28,
+            292
+          ],
+          "details": [
+            191,
+            270
+          ]
+        },
+        {
+          "inside": true,
+          "card": [
+            28,
+            292
+          ],
+          "details": [
+            191,
+            270
+          ]
+        },
+        {
+          "inside": true,
+          "card": [
+            28,
+            292
+          ],
+          "details": [
+            191,
+            270
+          ]
+        }
+      ],
+      "queuedCard": {
+        "queuedClass": true,
+        "badgeShown": true,
+        "inside": true,
+        "card": [
+          28,
+          292,
+          332
+        ],
+        "details": [
+          191,
+          270,
+          -237
+        ],
+        "queued": [
+          "Captain's Call answer - Rename the widgets CLI flag?: yes"
+        ]
+      }
+    }
+  },
+  {
+    "scn": "S6 no page errors",
+    "ok": true,
+    "info": []
+  },
+  {
+    "scn": "S7 queue then Details before advance: Close puts focus on the now-shown card Details button; one answer queued",
+    "ok": true,
+    "info": {
+      "openedOn": "Rename the widgets CLI flag?",
+      "activeText": "Details",
+      "inVisibleCard": true,
+      "visible": true,
+      "cardCount": "card 2 of 4 · 1 answered",
+      "queued": 1
+    }
+  },
+  {
+    "scn": "S7 no page errors",
+    "ok": true,
+    "info": []
+  }
+]
