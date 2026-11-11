@@ -96,13 +96,18 @@ For a contribution wake or linked-issue filing, go directly to Contribution foll
 
 Compose the payload from the same snapshot with the same ranking judgment as the chat digest, plus these board rules:
 
-- A Captain's Call decision key is the captain-held TASK ID from `decisions_open` (legacy `<origin>-decision-<key>` rows are already task ids); a merge card's key is `merge.<task-id>`; the Charted Next dispatch picker's key is `dispatch.charted`.
+- A Captain's Call decision key is the captain-held TASK ID from `decisions_open` (legacy `<origin>-decision-<key>` rows are already task ids); a merge card's key is `merge.<task-id>`; a worker-decision card's key is `steer.<task-id>.<decision-key>`; a review card's key is `review.<task-id>`; the Charted Next dispatch picker's key is `dispatch.charted`.
+- Compose a card for every Underway row that waits on the captain, and declare that wait on the row as `awaits` (`decision` or `review`); `build` refuses a waiting row without its card, and a worker-decision or review card that names no Underway row.
+  - Each snapshot `worker_decisions` row is a live worker's own open question: compose a worker-decision card (`type: "steer"`, `task`, `decision_key`) with authored options for the question plus the free-text note, unless the same task's captain hold already carries that question on its decision card.
+  - Work waiting on the captain's review - a draft PR, a review package, test results, a demo, or an outward draft (a Slack message, Linear comment, or PR comment) awaiting approval - is a review card (`type: "review"`, `task`) whose one option is `approve`, plus the free-text note.
+  - An outward draft goes in the review card's `drafts`, from the worker's draft file under `data/<task-id>/drafts/`, and its approve option reads as posting or sending exactly that text.
 - Before carding a hold, check that its SUBJECT has not already landed, and omit it when it has. `build` drops a card whose task or PR appears in the payload's own landed rows, and one whose task is no longer an open captain call. When a hold waits on one specific PR, put that PR in the card's `pr_url`. When it concerns a published version, put the artifact and numeric three-part version in the card's structured `subject`; landed rows for releases carry the same identity, and a matching or newer version drops the card. Identity matching is structured only, so verify any subject without one of these identities against current reality before carding it.
 - Never author a `reconcile` option on any card. `build` gives every decision card the standard reconcile choice itself, and the payload validator reserves that value across all card types; recommendations must name an authored option.
 - Compose exactly one decision card per captain-held task id. When one task carries multiple questions, consolidate all of them and their options into that card; never emit duplicate cards with the same task-id key.
 - Decision cards carry agent-authored copy: a short noun-phrase title, one-line `about` and `decide` context rows, and option labels with hints, with the recommended option marked.
-- Give every card `context` paragraphs and every authored option `details` paragraphs (shape: `bin/fm-bearings-board.sh` header), so its Details view explains the call and what each answer would do without the captain opening another source.
-- Card `type` (decision, merge, credential) is your composing judgment from the row's content; no backlog field types a card for you.
+- Give every card `context` paragraphs, every authored option `details` paragraphs, the artifacts the call rests on as `links` (the PR, demo videos, test plans and results, plans, report and draft files), and every outward text awaiting approval as `drafts` (shapes: `bin/fm-bearings-board.sh` header), so its Details view explains the call and what each answer would do without the captain opening another source.
+  Take links from the snapshot's recorded PRs and report pointers and from the task's own `data/<task-id>/` artifacts; a local file is linked by its absolute path, and `build` places it beside the board.
+- Card `type` (decision, merge, credential, steer, review) is your composing judgment from the row's content; no backlog field types a card for you.
 - When the card's task is a captain-gated WORK item (the answer should free it to proceed rather than complete it), set the card's `close: "release"` so the answer lifts the hold instead of closing the task; question-shaped items omit it.
 - A Charted Next row's optional `kind` separates work from alarms: omit it (or set `"queued"`) for real queued work, and set `"warning"` on every action-free fleet-integrity notice - the `(main-inventory)` gate, the `(return-catchup)` gate, an unavailable secondmate home, and an inventory-mismatch repair notice. The board badges a warning row `needs repair` instead of `waiting` and leaves it out of the Charted Next count, so those rows never read as dispatchable queued work.
 - `charted_more` counts omitted queued rows only, while `charted_warning_more` counts omitted warning rows only; keep both counts separate whenever the board payload truncates Charted Next.
@@ -128,10 +133,17 @@ Verify the call's latest state, then retire the request through `bin/fm-captain-
 Both outcomes refuse without that pending board-created request, and `bin/fm-captain-hold.sh reconcile list` names every request still outstanding.
 A remote-secondmate card whose task is absent from the main backlog remains on the board unchanged, but its reconcile request is refused in the main home until the separately tracked owner-aware routing follow-up can query and mutate the authoritative secondmate home; handle the announced capture without claiming that a request or reconciliation succeeded.
 `captain-hold-lifecycle` owns why a reconcile may never be recorded as the captain's answer.
-Route the non-decision keys yourself:
+Route the non-decision keys yourself; the keyed-answer intake reports each of them as `routed:` and never resolves one to a captain-held task:
 
 - `merge.<task-id>` is the captain's explicit merge order; follow the merge ruling below.
 - `dispatch.charted` carries comma-separated task ids the captain picked to start now; verify each id against the current backlog - still queued, blocker and time gate actually clear - then dispatch through the normal lifecycle, and report any id that no longer qualifies instead of forcing it.
+- `steer.<task-id>.<decision-key>` answers that live worker's own open question, and is never a captain-hold answer.
+  Match the key against a fresh snapshot's `worker_decisions` rows, where exactly one live task and one of its still-open decision keys must make it up, then send the selected option's meaning and any note to the worker with `bin/fm-send.sh <task-id> --resolve-key <decision-key>`.
+  When the decision has already closed, or the key matches no live task or more than one, report that instead of sending.
+- `review.<task-id>` is the captain's review of that task's waiting work.
+  `approve` is the captain's approval of exactly what the card presented: record it on the task's backlog item, then advance the work under the normal authority rules - it is never a merge order, which only a `merge.` answer or the captain's explicit word gives.
+  When the card carried a draft, approve means post or send exactly the text the board showed, which is the draft's byte copy in the board's `bearings-board-files` folder; when the worker's draft file no longer matches that copy, re-card the draft instead of posting either text.
+  An answer in the captain's own words is the captain's instruction: read it and act on it with judgment, relaying it to the worker and appending it to the task's `## Captain's intent` when it changes the ask.
 
 After handling, rebuild the board from a fresh snapshot so acted-on items leave Captain's Call, and echo every action taken in chat so the board and chat never diverge silently.
 

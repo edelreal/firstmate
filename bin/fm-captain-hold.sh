@@ -113,6 +113,13 @@
 # `reconcile-requests` intake verifies a captured source's binding before it
 # records a durable request under `state/reconcile-requests/`.
 #
+# BOARD-ROUTED KEYS ARE RESERVED HERE TOO. A key in the `merge.`, `dispatch.`,
+# `steer.`, or `review.` namespace is a Bearings board answer that Firstmate
+# routes itself (the bearings skill's board-wake section): a merge order, a
+# dispatch pick, a worker's own decision, or a review. `answers` reports it as
+# `routed:`, never resolves it to a task, and does not count it as skipped, so
+# no captain-held task id can ever be answered by one.
+#
 # `reconcile` is the verify-then-decide half. Both outcomes require the pending
 # request created by the captain's board selection. `close` is the moot outcome:
 # it requires the evidence that made the call moot, writes a `reconciled` resolution record
@@ -1565,6 +1572,10 @@ command_answers() {
     answer=$(sanitize_field "${answer:-}")
     [ -n "$answer" ] || continue
     label=$(sanitize_field "${label:-}")
+    if board_routed_key "$key"; then
+      printf 'routed: %s (a board key Firstmate routes, never a captain-held task)\n' "$key"
+      continue
+    fi
     if [ "$answer" = "$RECONCILE_VALUE" ]; then
       printf 'refused: %s (reconcile requests require a bound captured source)\n' "$key"
       skipped=$((skipped + 1))
@@ -1684,6 +1695,12 @@ command_answers() {
 RECONCILE_DIR="$STATE/reconcile-requests"
 RECONCILE_SCHEMA=fm-reconcile-request.v1
 RECONCILE_VALUE=reconcile
+
+# The Bearings board namespaces Firstmate routes itself (see the header).
+board_routed_key() {  # <key>
+  case "$1" in merge.*|dispatch.*|steer.*|review.*) return 0 ;; esac
+  return 1
+}
 
 reconcile_request_path() { printf '%s/%s.request\n' "$RECONCILE_DIR" "$1"; }
 

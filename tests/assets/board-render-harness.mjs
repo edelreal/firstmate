@@ -2,12 +2,20 @@
 // shim and print what the renderer actually produced, so board behavior is
 // asserted through the real template rather than by reading its source.
 //
-// Usage: node board-render-harness.mjs <built-board.html>
+// Usage: node board-render-harness.mjs <built-board.html> [<answers-json>]
+// <answers-json> is an optional array of {key, value, note}: after everything
+// else is recorded, each named card's option is selected, its note typed, and
+// its form submitted, and what that queued is reported under answers.
 // Prints one JSON document:
 //   { stats:[{n,label,tag,type,scrolls_to,target_declared,prompts}],
-//     captains_call:[text], underway:[{title,sub,badges}],
+//     captains_call:[text], underway:[{title,sub,badges,call}],
 //     charted:[{title,sub,badges,pickable}], empty, more, error,
-//     call:{wide:[page], narrow:[page], empty, details:[view]} }
+//     call:{wide:[page], narrow:[page], empty, details:[view]},
+//     row_links:[{row,label,shown,scrolls_to,prompts}],
+//     card_rows:[{card,underway,scrolls_to,prompts}],
+//     answers:[{key,found,prompts:[{text,tag,data}]}] }
+// row_links clicks each Underway row's card link and records the card then on
+// top of the stack; card_rows clicks each card's link back to its row.
 // where each Captain's Call page is {title, height, natural}: the card the back
 // and next buttons show, the height it lays out at, and the height its own
 // content needs. Layout is a toy model - text wraps at a fixed character width
@@ -15,8 +23,12 @@
 // assertions test how the page sizes its cards, not real font metrics. "wide"
 // pages after the initial render and web fonts load; "narrow" pages again after
 // the window narrows and fires resize. Each details view is what one card's
-// Details button opened: {button, was_closed, open, title, ctx_rows, context,
-// none, options:[{label, rec, hint, details}], links, closed_after, prompts}.
+// Details button opened: {button, was_closed, open, title, badges, ctx_rows,
+// context, none, options:[{label, rec, hint, details}], links, anchors,
+// link_items, drafts, link_prompts, closed_after, prompts}. links is every
+// link's href in the view; anchors adds its text, target and whether a plain
+// click follows it in Lavish's annotate mode; each draft reports its rendered
+// Markdown structure, its exact source, and the source toggle's effect.
 import { readFileSync } from "node:fs";
 
 const html = readFileSync(process.argv[2], "utf8");
@@ -143,6 +155,23 @@ globalThis.window = {
   requestAnimationFrame: (fn) => { frames.push(fn); },
 };
 globalThis.TextEncoder = TextEncoder;
+// FormData over the shim: a checked radio or checkbox, or any other named input.
+globalThis.FormData = class {
+  constructor(form) {
+    this.values = new Map();
+    const walk = (n) => {
+      for (const c of n.children) {
+        if (c.tagName === "input" && c.name) {
+          if (c.type !== "radio" && c.type !== "checkbox") this.values.set(c.name, c.value);
+          else if (c.checked) this.values.set(c.name, c.value);
+        }
+        walk(c);
+      }
+    };
+    walk(form);
+  }
+  get(name) { return this.values.has(name) ? this.values.get(name) : null; }
+};
 
 const script = html.slice(html.indexOf("<script>") + "<script>".length, html.lastIndexOf("</script>"));
 new Function(script)();
@@ -181,12 +210,54 @@ const pageCall = () => {
 };
 // Open each card's Details view with its button, record what the full-screen
 // view shows, then close it again with its Close button.
-const linksIn = (n, out = []) => {
+const tagged = (n, tag, out = []) => {
   for (const c of n.children) {
-    if (c.tagName === "a" && c.href) out.push(c.href);
-    linksIn(c, out);
+    if (c.tagName === tag) out.push(c);
+    tagged(c, tag, out);
   }
   return out;
+};
+const linksIn = (n) => tagged(n, "a").filter((a) => a.href).map((a) => a.href);
+const anchorOf = (a) => ({
+  href: a.href, text: a.textContent, target: a.target,
+  follows: Object.hasOwn(a.attributes, "data-lavish-action"),
+});
+// The rendered structure of one Markdown draft: every element tag in document
+// order (text runs left out), plus the pieces a reader checks.
+const markdownOf = (md) => {
+  const tags = [];
+  const walk = (n) => {
+    for (const c of n.children) {
+      if (c.tagName !== "span") tags.push(c.tagName);
+      walk(c);
+    }
+  };
+  walk(md);
+  return {
+    tags,
+    text: md.textContent,
+    list_items: tagged(md, "li").map((li) => li.textContent),
+    table: tagged(md, "tr").map((tr) => tr.children.map((c) => `${c.tagName}:${c.textContent}`)),
+    code: tagged(md, "pre").map((p) => p.textContent),
+    links: tagged(md, "a").map(anchorOf),
+  };
+};
+const draftOf = (d) => {
+  const body = d.querySelectorAll(".bb-draft__body")[0];
+  const src = d.querySelectorAll(".bb-draft__src")[0];
+  const toggle = d.querySelectorAll(".bb-draft__toggle")[0];
+  const state = () => ({ rendered: !body.hidden, source: !src.hidden, toggle: toggle.textContent });
+  const before = state();
+  toggle.dispatch("click");
+  const after = state();
+  toggle.dispatch("click");
+  return {
+    label: d.querySelectorAll(".bb-draft__label")[0]?.textContent ?? null,
+    rendered: markdownOf(d.querySelectorAll(".bb-md")[0]),
+    source: src.textContent,
+    before, after, restored: state(),
+    file: d.querySelectorAll(".bb-draft__foot").flatMap((f) => tagged(f, "a")).map(anchorOf),
+  };
 };
 const details = decisionCards().map((card) => {
   const btn = card.querySelectorAll(".bb-detailsbtn")[0];
@@ -202,6 +273,8 @@ const details = decisionCards().map((card) => {
     was_closed: wasClosed,
     open: !modal.hidden,
     title: byId.get("bb-modal-title").textContent,
+    badges: byId.get("bb-modal-meta").children
+      .filter((c) => c.className.includes("fm-badge")).map(text),
     ctx_rows: body.querySelectorAll(".bb-ctx__row").map((r) => r.children.map(text)),
     context: body.querySelectorAll(".bb-modal__ctxp").map(text),
     none: body.querySelectorAll(".bb-modal__none").map(text),
@@ -212,7 +285,17 @@ const details = decisionCards().map((card) => {
       details: o.querySelectorAll(".bb-modal__optp").map(text),
     })),
     links: linksIn(body),
+    anchors: tagged(body, "a").filter((a) => a.href).map(anchorOf),
+    link_items: body.querySelectorAll(".bb-links__item").map((li) => ({
+      ...anchorOf(tagged(li, "a")[0]),
+      where: li.querySelectorAll(".bb-links__where")[0]?.textContent ?? null,
+    })),
+    drafts: body.querySelectorAll(".bb-draft").map(draftOf),
   };
+  // Following a link is a plain navigation: it must reach nothing in the agent.
+  const beforeLinks = prompts.length;
+  for (const a of tagged(body, "a")) a.dispatch("click");
+  view.link_prompts = prompts.length - beforeLinks;
   byId.get("bb-modal-close").dispatch("click");
   view.closed_after = modal.hidden;
   view.prompts = prompts.length - before;
@@ -254,11 +337,62 @@ const rowsOf = (container) =>
         sub: main?.children.find((c) => c.className.includes("bb-row__sub"))?.textContent ?? "",
         badges: badgesOf(row),
         pickable: row.children.some((c) => c.className.includes("bb-pick") && !c.className.includes("spacer")),
+        call: row.children.find((c) => c.className.includes("bb-row__call"))?.textContent ?? null,
       };
     });
 
 const uw = byId.get("bb-underway") || new Node("div");
 const underway = rowsOf(uw);
+
+const shownTitle = () => decisionCards().filter((c) => !c.hidden)
+  .map((c) => c.querySelectorAll(".bb-decision__title")[0]?.textContent ?? "");
+// Click a control and record where the page scrolled and what it queued.
+const clickAndRecord = (node) => {
+  const before = { scrolls: scrolls.length, prompts: prompts.length };
+  node.dispatch("click");
+  return {
+    scrolls_to: scrolls.slice(before.scrolls).map((h) => h.id),
+    prompts: prompts.length - before.prompts,
+  };
+};
+// Each Underway row's link deals its card to the top of the stack.
+const row_links = uw.children
+  .filter((r) => r.className.split(/\s+/).includes("bb-row"))
+  .flatMap((row) => {
+    const btn = row.children.find((c) => c.className.includes("bb-row__call"));
+    if (!btn) return [];
+    const title = row.children.find((c) => c.className.includes("bb-row__main"))
+      ?.children.find((c) => c.className.includes("bb-row__title"))?.textContent ?? "";
+    const hit = clickAndRecord(btn);
+    return [{ row: title, label: btn.textContent, shown: shownTitle(), ...hit }];
+  });
+// Each card on live work names its Underway row and scrolls to it.
+const card_rows = decisionCards().flatMap((card) => {
+  const link = card.querySelectorAll(".bb-ctx__link")[0];
+  if (!link) return [];
+  const hit = clickAndRecord(link);
+  return [{
+    card: card.querySelectorAll(".bb-decision__title")[0]?.textContent ?? "",
+    underway: link.textContent, ...hit,
+  }];
+});
+
+// Answer the cards the caller named, last, so nothing above saw a queued prompt.
+const formFor = (key) => tagged(deck, "form").find((f) => f.attributes["data-lavish-question"] === key);
+const answers = (process.argv[3] ? JSON.parse(process.argv[3]) : []).map(({ key, value, note }) => {
+  const form = formFor(key);
+  if (!form) return { key, found: false, prompts: [] };
+  for (const input of tagged(form, "input")) {
+    if (input.type === "radio") input.checked = value != null && input.value === value;
+    else if (input.type === "text") input.value = note ?? "";
+  }
+  const before = prompts.length;
+  form.dispatch("submit");
+  return {
+    key, found: true,
+    prompts: prompts.slice(before).map(([text, opts]) => ({ text, tag: opts?.tag ?? null, data: opts?.data ?? null })),
+  };
+});
 const captains_call = (byId.get("bb-call") || new Node("div")).children
   .filter((n) => n.className.split(/\s+/).includes("bb-decision"))
   .map((n) => n.textContent);
@@ -276,4 +410,5 @@ const more = ch.children.filter((c) => c.className.includes("bb-morechip")).map(
 
 process.stdout.write(
   JSON.stringify({ stats, captains_call, underway, charted, empty, more, error: errorText,
-    call: { wide: callWide, narrow: callNarrow, empty: callEmpty, details } }) + "\n");
+    call: { wide: callWide, narrow: callNarrow, empty: callEmpty, details },
+    row_links, card_rows, answers }) + "\n");

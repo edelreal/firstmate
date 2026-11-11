@@ -74,11 +74,40 @@
 #
 # Every Underway row likewise carries a non-empty `name`: the durable task name
 # when known, otherwise its durable identifier.
+#
+# Card types are decision, merge, credential, steer, and review. A steer card
+# is a live worker's open keyed decision: it carries `task` (its Underway row
+# id) and `decision_key`, its key is exactly `steer.<task>.<decision_key>`, and
+# `allow_freeform` is true. A review card asks the captain to review a live
+# task's work: it carries `task`, its key is exactly `review.<task>`, its only
+# option value is `approve`, and `allow_freeform` is true. Neither carries
+# `close`, and neither is a captain hold: bin/fm-captain-hold.sh's keyed-answer
+# intake reserves their namespaces for Firstmate's own routing.
+#
+# PAIRING. An Underway row MAY declare `awaits`: "decision" or "review" (absent
+# or null means it waits on nobody). build refuses a row awaiting a decision
+# that no steer card (by `task`) or decision card (by key) names, a row
+# awaiting a review that no review card names, and a steer or review card whose
+# `task` is no Underway row id. The rendered row links to its card, and the card
+# names its row.
+#
 # A Captain's Call item MAY carry `context`, and each of its options MAY carry
-# `details`: each a non-empty array of non-empty paragraph strings. The card's
-# Details button opens a full-screen view of the call - its about, decide and
-# context, then every option with its hint and details - and queues nothing.
-# Only https:// URLs inside a paragraph render as links.
+# `details`: each a non-empty array of non-empty paragraph strings. It MAY also
+# carry `links` and `drafts`, each a non-empty array. A link is {label, url}
+# with an https:// url, or {label, file} with an absolute local path; a draft is
+# {label, text} or {label, file} naming non-empty UTF-8 text of at most 65536
+# bytes. Neither may carry `href`, which build writes. Lavish serves nothing
+# outside the board's directory, so build places every linked or draft file in
+# the bearings-board-files folder beside the board, replaces that folder on
+# every build, and refuses a file that is not a readable regular file. A draft
+# file is placed as a byte copy, and its content becomes its `text`, so the copy
+# is the text the board showed. An audio or video link opens a generated
+# player page, because the browser will not play media opened straight from
+# Lavish's sandboxed route. The card's Details button opens a full-screen view
+# of the call - its about, decide and context, its links, each draft rendered as
+# Markdown with its exact source one click away, then every option with its hint
+# and details - and queues nothing. Links open in a new tab, and nothing but an
+# https:// URL or a file in the board's own folder is ever linked.
 # A Charted Next row MAY carry `filed`, the durable filed date (YYYY-MM-DD, or
 # that date with a UTC timestamp) the template orders the section by, newest
 # first; a row with no comparable date keeps its payload order after every dated
@@ -137,11 +166,26 @@ validate_payload() {  # <data.json>
       (has($name) | not)
       or (.[$name]
         | if type == "array" then length > 0 and all(.[]; nonempty_string) else false end);
-    def optional_https_url($name):
+    def https_url:
+      type == "string"
+      and test("^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:[/?#][^[:space:]]*)?$");
+    def optional_https_url($name): (has($name) | not) or (.[$name] | https_url);
+    def local_file: type == "string" and test("^/[^\\x00-\\x1f\\x7f]+$");
+    def link_item:
+      type == "object"
+      and (.label | nonempty_string)
+      and (has("href") | not)
+      and (if has("url") then (.url | https_url) and (has("file") | not)
+        else has("file") and (.file | local_file) end);
+    def draft_item:
+      type == "object"
+      and (.label | nonempty_string)
+      and (has("href") | not)
+      and (if has("text") then (.text | nonempty_string) and (.text | utf8bytelength <= 65536) and (has("file") | not)
+        else has("file") and (.file | local_file) end);
+    def optional_list($name; item):
       (has($name) | not)
-      or (.[$name]
-        | type == "string"
-          and test("^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:[/?#][^[:space:]]*)?$"));
+      or (.[$name] | if type == "array" then length > 0 and all(.[]; item) else false end);
     def version: type == "string" and test("^(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})$");
     def optional_subject:
       (has("subject") | not)
@@ -153,7 +197,8 @@ validate_payload() {  # <data.json>
     def call_item:
       type == "object"
       and (.key | slug(128))
-      and (.type == "decision" or .type == "merge" or .type == "credential")
+      and (.type == "decision" or .type == "merge" or .type == "credential"
+        or .type == "steer" or .type == "review")
       and repo_marker
       and (.title | nonempty_string)
       and (.options | type == "array")
@@ -179,10 +224,22 @@ validate_payload() {  # <data.json>
           and (.recommend_value as $recommend
             | ([.options[].value] | index($recommend) != null))))
       and ([.options[].value] | index("reconcile") == null)
-      and (if .type == "merge" then (.risk | nonempty_string) else true end);
+      and optional_list("links"; link_item)
+      and optional_list("drafts"; draft_item)
+      and (if .type == "merge" then (.risk | nonempty_string) else true end)
+      and (if .type == "steer" then
+          (.task | slug(128)) and (.decision_key | slug(128))
+          and .key == ("steer." + .task + "." + .decision_key)
+          and .allow_freeform == true and (has("close") | not)
+        elif .type == "review" then
+          (.task | slug(128)) and .key == ("review." + .task)
+          and ([.options[].value] == ["approve"])
+          and .allow_freeform == true and (has("close") | not)
+        else true end);
     def underway_item:
       type == "object" and repo_marker and name_marker and (.id | nonempty_string)
-      and (.state | nonempty_string) and (.doing | nonempty_string) and (.kind | nonempty_string);
+      and (.state | nonempty_string) and (.doing | nonempty_string) and (.kind | nonempty_string)
+      and ((has("awaits") | not) or .awaits == null or .awaits == "decision" or .awaits == "review");
     def landed_item:
       type == "object" and repo_marker and (.id | nonempty_string)
       and (.what | nonempty_string) and (.owner | nonempty_string)
@@ -213,6 +270,149 @@ validate_payload() {  # <data.json>
     and ([.landed[] | landed_item] | all)
     and ([.charted[] | charted_item] | all)
   ' "$1" >/dev/null
+}
+
+# One line per broken Underway pairing; empty output means the payload pairs.
+pairing_problems() {  # <data.json>
+  jq -r '
+    . as $p
+    | ($p.underway[] | select(.awaits == "decision") | .id as $id
+        | select(any($p.captains_call[];
+            (.type == "steer" and .task == $id) or (.type == "decision" and .key == $id)) | not)
+        | "the Underway row \($id) awaits a decision but no worker-decision or decision card names it"),
+      ($p.underway[] | select(.awaits == "review") | .id as $id
+        | select(any($p.captains_call[]; .type == "review" and .task == $id) | not)
+        | "the Underway row \($id) awaits a review but no review card names it"),
+      ($p.captains_call[] | select(.type == "steer" or .type == "review") | . as $card
+        | select(any($p.underway[]; .id == $card.task) | not)
+        | "the \($card.type) card \($card.key) names no Underway row")
+  ' "$1"
+}
+
+# --- Linked files beside the board --------------------------------------------
+# Lavish serves only the board's own directory, and refuses a symlink that
+# leaves it, so a linked local file is hardlinked (copied across filesystems)
+# into one folder beside the board. Audio and video opened straight from that
+# route never load under Lavish's sandbox policy, so a media file also gets a
+# small player page, which is what its link opens.
+
+FILES_DIR=bearings-board-files
+
+say() { printf 'fm-bearings-board: %s\n' "$*" >&2; }
+
+safe_file_name() {  # <name>
+  local name
+  name=$(printf '%s' "$1" | LC_ALL=C tr -c 'A-Za-z0-9._-' '-')
+  name=${name#"${name%%[!.]*}"}
+  name=${name:0:80}
+  printf '%s\n' "${name:-file}"
+}
+
+media_tag() {  # <file-name>; prints video, audio, or nothing
+  case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+    *.mp4|*.m4v|*.mov|*.webm|*.ogv) printf 'video\n' ;;
+    *.mp3|*.m4a|*.wav|*.oga|*.ogg|*.opus|*.flac) printf 'audio\n' ;;
+  esac
+}
+
+html_escape() { printf '%s' "$1" | perl -pe 's/&/&amp;/g; s/</&lt;/g; s/>/&gt;/g; s/"/&quot;/g'; }
+
+write_player_page() {  # <dest.html> <media-file-name> <video|audio> <label>
+  local title
+  title=$(html_escape "$4")
+  cat > "$1" <<EOF
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>$title</title>
+<style>
+body { margin: 0; min-height: 100vh; box-sizing: border-box; padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #1a2238; color: #fbf4e2; font-family: Jost, ui-sans-serif, system-ui, sans-serif; }
+h1 { margin: 0; font-size: 1.05rem; font-weight: 700; text-align: center; }
+video, audio { max-width: 100%; max-height: 82vh; }
+a { color: #f0d38c; font-size: 0.85rem; }
+</style></head>
+<body><h1>$title</h1><$3 controls preload="metadata" src="$2"></$3><a href="$2" download>Download $2</a></body></html>
+EOF
+}
+
+# A draft must be readable as the exact text that will be posted.
+draft_text_ok() {  # <file>
+  [ "$(LC_ALL=C wc -c < "$1" | tr -d ' ')" -le 65536 ] || return 1
+  perl -e 'local $/; my $s = <STDIN>; exit((defined($s) && length($s) && utf8::decode($s) && $s !~ /\x00/) ? 0 : 1)' < "$1"
+}
+
+# Place every linked file and draft file in <stage-dir> and rewrite <payload>
+# in place: each gets the folder-relative `href` the template opens, and a draft
+# file's content becomes its `text`.
+stage_linked_files() {  # <payload> <stage-dir>
+  local payload=$1 stage=$2 next kind i j file src name href tag label n=0
+  next=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-bearings-files.XXXXXX") || return 1
+  while read -r kind i j; do
+    [ -n "$kind" ] || continue
+    file=$(jq -r --arg k "$kind" --argjson i "$i" --argjson j "$j" '.captains_call[$i][$k][$j].file' "$payload") \
+      || { rm -f -- "$next"; return 1; }
+    src=$(board_realpath "$file") || src=''
+    if [ -z "$src" ] || [ ! -f "$src" ] || [ ! -r "$src" ]; then
+      say "linked file is not a readable regular file: $file"
+      rm -f -- "$next"
+      return 1
+    fi
+    if [ "$kind" = drafts ] && ! draft_text_ok "$src"; then
+      say "draft file is not non-empty UTF-8 text of at most 65536 bytes: $file"
+      rm -f -- "$next"
+      return 1
+    fi
+    n=$((n + 1))
+    name=$(printf '%03d-%s' "$n" "$(safe_file_name "${file##*/}")")
+    # A draft is always a byte copy, so it stays the text the board showed even
+    # if its source changes; any other file may share the source's inode.
+    if [ "$kind" = drafts ]; then
+      cp -- "$src" "$stage/$name"
+    else
+      ln -- "$src" "$stage/$name" 2>/dev/null || cp -- "$src" "$stage/$name"
+    fi || {
+      say "cannot place the linked file beside the board: $file"
+      rm -f -- "$next"
+      return 1
+    }
+    href="$FILES_DIR/$name"
+    tag=''
+    [ "$kind" = drafts ] || tag=$(media_tag "$name")
+    if [ -n "$tag" ]; then
+      label=$(jq -r --argjson i "$i" --argjson j "$j" '.captains_call[$i].links[$j].label' "$payload")
+      write_player_page "$stage/$name.html" "$name" "$tag" "$label" || { rm -f -- "$next"; return 1; }
+      href="$href.html"
+    fi
+    if [ "$kind" = drafts ]; then
+      jq --argjson i "$i" --argjson j "$j" --arg href "$href" --rawfile text "$src" \
+        '.captains_call[$i].drafts[$j] += {text: $text, href: $href}' "$payload" > "$next"
+    else
+      jq --argjson i "$i" --argjson j "$j" --arg href "$href" \
+        '.captains_call[$i].links[$j].href = $href' "$payload" > "$next"
+    fi || { rm -f -- "$next"; return 1; }
+    mv -f -- "$next" "$payload" || { rm -f -- "$next"; return 1; }
+  done < <(jq -r '
+    .captains_call | to_entries[] | .key as $i | .value
+    | ("links", "drafts") as $k
+    | (.[$k] // []) | to_entries[] | select(.value.file != null)
+    | "\($k) \($i) \(.key)"' "$payload")
+  rm -f -- "$next"
+}
+
+# Swap the staged folder in for the live one, so a rebuild never leaves a file
+# from an earlier board behind.
+publish_linked_files() {  # <stage-dir> <board-dir>
+  local stage=$1 live=$2/$FILES_DIR old=''
+  [ ! -L "$live" ] || return 1
+  if [ -e "$live" ]; then
+    old=$(mktemp -d "$2/.$FILES_DIR-old.XXXXXX") || return 1
+    mv -- "$live" "$old/" || { rmdir -- "$old"; return 1; }
+  fi
+  if ! mv -- "$stage" "$live"; then
+    [ -z "$old" ] || mv -- "$old/$FILES_DIR" "$live"
+    return 1
+  fi
+  [ -z "$old" ] || rm -rf -- "$old"
 }
 
 # --- Lavish session liveness -------------------------------------------------
@@ -369,12 +569,17 @@ await_source_owner() {  # <source-id>
 }
 
 command_build() {
-  local data=${1-} board json tmp sid extracted effective owner version pre_reopen_owner
+  local data=${1-} board json tmp sid extracted effective owner version pre_reopen_owner problems stage
   [ "$#" -eq 1 ] || { usage >&2; exit 2; }
   command -v jq >/dev/null 2>&1 || fail "jq is required"
   [ -f "$data" ] || fail "board data does not exist: $data"
   jq empty "$data" 2>/dev/null || fail "board data is not valid JSON: $data"
   validate_payload "$data" || fail "board data does not satisfy $BOARD_SCHEMA: $data"
+  problems=$(pairing_problems "$data") || fail "cannot check the board data's Underway pairing: $data"
+  if [ -n "$problems" ]; then
+    printf '%s\n' "$problems" | sed 's/^/fm-bearings-board: /' >&2
+    fail "board data does not satisfy $BOARD_SCHEMA pairing: $data"
+  fi
   [ -f "$TEMPLATE" ] && [ ! -L "$TEMPLATE" ] || fail "board template is missing: $TEMPLATE"
   [ "$(grep -cxF "$PLACEHOLDER" "$TEMPLATE")" -eq 1 ] \
     || fail "board template does not carry exactly one data slot: $TEMPLATE"
@@ -385,21 +590,31 @@ command_build() {
     rm -f -- "$effective"
     fail "cannot reconcile the board payload against landed work"
   fi
-  json=$(jq -c . "$effective") || { rm -f -- "$effective"; fail "cannot compact the board data"; }
+
+  board=$(board_path)
+  (umask 077; mkdir -p "${board%/*}") || { rm -f -- "$effective"; fail "cannot create ${board%/*}"; }
+  stage=$(umask 077; mktemp -d "${board%/*}/.$FILES_DIR.XXXXXX") \
+    || { rm -f -- "$effective"; fail "cannot stage the board's linked files"; }
+  if ! stage_linked_files "$effective" "$stage"; then
+    rm -rf -- "$stage"
+    rm -f -- "$effective"
+    fail "cannot place the board's linked files beside it"
+  fi
+  json=$(jq -c . "$effective") || { rm -rf -- "$stage"; rm -f -- "$effective"; fail "cannot compact the board data"; }
   rm -f -- "$effective"
   # `<` never appears in JSON syntax outside strings, so escaping every
   # occurrence keeps the payload valid JSON while making </script> inert.
   json=${json//</\\u003c}
 
-  board=$(board_path)
-  (umask 077; mkdir -p "${board%/*}") || fail "cannot create ${board%/*}"
-  tmp=$(umask 077; mktemp "${board%/*}/.board.XXXXXX") || fail "cannot stage the board"
+  tmp=$(umask 077; mktemp "${board%/*}/.board.XXXXXX") || { rm -rf -- "$stage"; fail "cannot stage the board"; }
   if ! BOARD_JSON="$json" perl -pe "s/^\\Q$PLACEHOLDER\\E\$/\$ENV{BOARD_JSON}/" "$TEMPLATE" > "$tmp"; then
     rm -f -- "$tmp"
+    rm -rf -- "$stage"
     fail "cannot inject the board data"
   fi
   if grep -qxF "$PLACEHOLDER" "$tmp"; then
     rm -f -- "$tmp"
+    rm -rf -- "$stage"
     fail "the board data slot survived injection"
   fi
   # Round-trip the injected payload back out of the built page, so a board that
@@ -408,7 +623,13 @@ command_build() {
     | sed '1d;$d')
   if ! printf '%s\n' "$extracted" | jq -e --arg schema "$BOARD_SCHEMA" '.schema == $schema' >/dev/null 2>&1; then
     rm -f -- "$tmp"
+    rm -rf -- "$stage"
     fail "the built board does not carry a readable $BOARD_SCHEMA payload"
+  fi
+  if ! publish_linked_files "$stage" "${board%/*}"; then
+    rm -f -- "$tmp"
+    rm -rf -- "$stage"
+    fail "cannot publish the board's linked files"
   fi
   if ! { chmod 0600 "$tmp" && mv -f -- "$tmp" "$board"; }; then
     rm -f -- "$tmp"

@@ -283,6 +283,52 @@ body.bb-modal-open { overflow: hidden; }
   .bb-modal__headin, .bb-modal__bodyin { padding-left: 16px; padding-right: 16px; }
 }
 
+/* Details: the artifacts to review, and each draft as it will appear */
+.bb-links { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.bb-links li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; }
+.bb-links__where { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-faint); overflow-wrap: anywhere; }
+.bb-draft { display: flex; flex-direction: column; background: var(--surface-card); border: 1.5px solid var(--border-default); border-radius: var(--radius-sm); overflow: hidden; }
+.bb-draft__head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border-soft); background: var(--paper-000); }
+.bb-draft__label { flex: 1 1 auto; min-width: 0; font-size: var(--fs-sm); font-weight: 800; color: var(--text-strong); overflow-wrap: anywhere; }
+.bb-draft__body { padding: 14px 16px; min-width: 0; }
+.bb-draft__body[hidden], .bb-draft__src[hidden] { display: none; }
+.bb-draft__foot { margin: 0; padding: 8px 16px 12px; border-top: 1px solid var(--border-soft); }
+.bb-draft__src { margin: 0; padding: 14px 16px; white-space: pre-wrap; overflow-wrap: anywhere;
+  font-family: var(--font-mono); font-size: var(--fs-xs); line-height: 1.5; color: var(--text-strong); background: var(--paper-000); }
+.bb-md { display: flex; flex-direction: column; gap: 10px; min-width: 0; font-size: var(--fs-base); color: var(--text-body); line-height: 1.55; overflow-wrap: anywhere; }
+.bb-md p, .bb-md ul, .bb-md ol, .bb-md pre, .bb-md table, .bb-md blockquote, .bb-md hr,
+.bb-md h3, .bb-md h4, .bb-md h5, .bb-md h6 { margin: 0; }
+.bb-md ul, .bb-md ol { padding-left: 1.5em; }
+.bb-md li + li, .bb-md li > ul, .bb-md li > ol, .bb-md li > p + p { margin-top: 3px; }
+.bb-md__task { list-style: none; margin-left: -1.25em; }
+.bb-md h3 { font-size: var(--fs-h4); } .bb-md h4 { font-size: 1.05rem; }
+.bb-md h5, .bb-md h6 { font-size: var(--fs-base); }
+.bb-md h3, .bb-md h4, .bb-md h5, .bb-md h6 { font-weight: 800; color: var(--text-strong); line-height: 1.3; }
+.bb-md code { font-family: var(--font-mono); font-size: 0.86em; background: var(--paper-200); border-radius: 4px; padding: 1px 5px; }
+.bb-md pre { padding: 12px 14px; background: var(--navy-700); color: var(--paper-000); border-radius: var(--radius-xs); overflow-x: auto; }
+.bb-md pre code { background: none; padding: 0; color: inherit; font-size: var(--fs-xs); white-space: pre; }
+.bb-md table { border-collapse: collapse; display: block; max-width: 100%; overflow-x: auto; font-size: var(--fs-sm); }
+.bb-md th, .bb-md td { border: 1px solid var(--border-default); padding: 6px 10px; text-align: left; vertical-align: top; }
+.bb-md th { background: var(--paper-100); font-weight: 800; color: var(--text-strong); }
+.bb-md blockquote { padding: 2px 0 2px 12px; border-left: 3px solid var(--border-default); color: var(--text-muted); display: flex; flex-direction: column; gap: 8px; }
+.bb-md hr { border: 0; border-top: 1px solid var(--border-default); }
+.bb-md a { color: var(--ocean-600); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+
+/* a waiting Underway row and its Captain's Call card point at each other */
+.bb-row__call {
+  flex: none; font-family: var(--font-sans); font-size: var(--fs-2xs); font-weight: 800; line-height: 1;
+  text-transform: uppercase; letter-spacing: 0.07em; white-space: nowrap; cursor: pointer;
+  padding: 6px 9px 5px; color: var(--rust-600); background: var(--rust-050);
+  border: 1.5px solid var(--rust-500); border-radius: var(--radius-xs);
+}
+.bb-row__call:hover { background: var(--rust-100); }
+.bb-ctx__link { font: inherit; margin: 0; padding: 0; border: 0; background: none; cursor: pointer; text-align: left;
+  color: var(--ocean-600); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.bb-row__call:focus-visible, .bb-ctx__link:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.bb-row[id] { scroll-margin-top: 80px; }
+.bb-row.is-target { background: var(--gold-100); }
+.bb-decision.is-target { box-shadow: 0 0 0 3px var(--gold-500), var(--shadow-hard); }
+
 /* ---- compact rows (Underway / Landed / Charted) ---- */
 .bb-rows { display: flex; flex-direction: column; }
 .bb-row {
@@ -500,6 +546,195 @@ __FM_BEARINGS_BOARD_DATA__
     return n;
   }
   function badge(tone, text) { return el("span", "fm-badge fm-badge--" + tone, text); }
+  /* Every board link opens in a new tab. data-lavish-action lets a plain click
+     follow it in Lavish's annotate mode instead of opening an annotation card;
+     following a link queues nothing for the agent. */
+  function linkTo(href, text, cls) {
+    var a = el("a", cls || null, text);
+    a.href = href; a.target = "_blank"; a.rel = "noopener";
+    a.setAttribute("data-lavish-action", "");
+    return a;
+  }
+  /* Only an https:// URL or a file build placed beside the board is linked. */
+  var HTTPS_HREF = /^https:\/\/[^\s<>"'`]+$/;
+  var LOCAL_HREF = /^bearings-board-files\/[A-Za-z0-9._-]+$/;
+  function safeHref(o) {
+    if (o && typeof o.url === "string" && HTTPS_HREF.test(o.url)) return o.url;
+    if (o && typeof o.href === "string" && LOCAL_HREF.test(o.href)) return o.href;
+    return null;
+  }
+  function reducedMotion() {
+    return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }
+  function flash(node) {
+    if (!node || !node.classList) return;
+    node.classList.add("is-target");
+    setTimeout(function () { node.classList.remove("is-target"); }, 1600);
+  }
+
+  /* Markdown, rendered the way a draft will appear once posted: block structure
+     (headings, lists, tables, fenced code, quotes, rules, paragraphs whose line
+     breaks are kept) and inline code, emphasis, strikethrough and https links.
+     Everything is built as text nodes, so draft text can never inject markup. */
+  var MD_FENCE = /^ {0,3}(`{3,}|~{3,})[^`]*$/;
+  var MD_HEADING = /^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/;
+  var MD_RULE = /^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/;
+  var MD_QUOTE = /^ {0,3}>[ \t]?/;
+  var MD_ITEM = /^( *)([-*+]|\d{1,9}[.)])[ \t]+(.*)$/;
+  var MD_TABLE_SEP = /^ *\|? *:?-+:? *(\| *:?-+:? *)*\|? *$/;
+  var MD_INLINE = /(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)|\[([^\]\n]+)\]\((https:\/\/[^\s)]+)\)|https:\/\/[^\s<>"'`]+|\*\*(?=\S)([\s\S]*?\S)\*\*|(?<![A-Za-z0-9])__(?=\S)([\s\S]*?\S)__(?![A-Za-z0-9])|~~(?=\S)([\s\S]*?\S)~~|\*(?=[^\s*])([\s\S]*?[^\s*])\*|(?<![A-Za-z0-9])_(?=[^\s_])([\s\S]*?[^\s_])_(?![A-Za-z0-9])/g;
+  function mdInline(node, text) {
+    var s = String(text), last = 0, m, re = new RegExp(MD_INLINE.source, "g");
+    while ((m = re.exec(s)) !== null) {
+      var used = m[0].length;
+      var url = null;
+      if (!m[1] && m[3] == null && m[5] == null && m[6] == null && m[7] == null && m[8] == null && m[9] == null) {
+        url = m[0].replace(/[.,;:!?)\]]+$/, "");
+        if (url.length <= "https://".length) { re.lastIndex = m.index + 1; continue; }
+        used = url.length;
+      }
+      if (m.index > last) node.appendChild(el("span", null, s.slice(last, m.index)));
+      if (m[1]) node.appendChild(el("code", null, m[2]));
+      else if (m[3] != null) node.appendChild(mdInline(linkTo(m[4], null, null), m[3]));
+      else if (m[5] != null || m[6] != null) node.appendChild(mdInline(el("strong"), m[5] != null ? m[5] : m[6]));
+      else if (m[7] != null) node.appendChild(mdInline(el("del"), m[7]));
+      else if (m[8] != null || m[9] != null) node.appendChild(mdInline(el("em"), m[8] != null ? m[8] : m[9]));
+      else node.appendChild(linkTo(url, url, null));
+      last = m.index + used;
+      re.lastIndex = last;
+    }
+    if (last < s.length) node.appendChild(el("span", null, s.slice(last)));
+    return node;
+  }
+  function mdIndent(line) { return /^ */.exec(line)[0].length; }
+  function mdBlank(line) { return /^\s*$/.test(line); }
+  function mdTableStart(lines, i) {
+    return i + 1 < lines.length && lines[i].indexOf("|") !== -1 &&
+      MD_TABLE_SEP.test(lines[i + 1]) && lines[i + 1].indexOf("-") !== -1;
+  }
+  function mdBlockStart(lines, i) {
+    var l = lines[i];
+    return MD_FENCE.test(l) || MD_HEADING.test(l) || MD_RULE.test(l) || MD_QUOTE.test(l) ||
+      MD_ITEM.test(l) || mdTableStart(lines, i);
+  }
+  function mdCells(line) {
+    var s = line.trim().replace(/^\|/, "").replace(/(^|[^\\])\|$/, "$1");
+    var cells = [], cur = "";
+    for (var k = 0; k < s.length; k++) {
+      if (s[k] === "\\" && s[k + 1] === "|") { cur += "|"; k++; }
+      else if (s[k] === "|") { cells.push(cur.trim()); cur = ""; }
+      else cur += s[k];
+    }
+    cells.push(cur.trim());
+    return cells;
+  }
+  function mdList(parent, lines, i) {
+    var first = MD_ITEM.exec(lines[i]);
+    var indent = first[1].length, ordered = /\d/.test(first[2]);
+    var list = el(ordered ? "ol" : "ul");
+    if (ordered && parseInt(first[2], 10) !== 1) list.setAttribute("start", String(parseInt(first[2], 10)));
+    while (i < lines.length) {
+      var m = MD_ITEM.exec(lines[i]);
+      if (!m || m[1].length !== indent || /\d/.test(m[2]) !== ordered) break;
+      var inner = indent + m[2].length + 1, item = [m[3]];
+      i++;
+      while (i < lines.length) {
+        var l = lines[i];
+        if (mdBlank(l)) {
+          var k = i + 1;
+          while (k < lines.length && mdBlank(lines[k])) k++;
+          if (k < lines.length && mdIndent(lines[k]) > indent) { item.push(""); i++; continue; }
+          break;
+        }
+        var sub = MD_ITEM.exec(l);
+        if (sub && sub[1].length <= indent) break;
+        if (mdIndent(l) > indent) { item.push(l.slice(Math.min(mdIndent(l), inner))); i++; continue; }
+        if (!mdBlockStart(lines, i)) { item.push(l); i++; continue; }
+        break;
+      }
+      var li = el("li");
+      var task = /^\[([ xX])\][ \t]+([\s\S]*)$/.exec(item[0]);
+      if (task) {
+        li.className = "bb-md__task";
+        li.appendChild(el("span", null, task[1] === " " ? "☐ " : "☑ "));
+        item[0] = task[2];
+      }
+      mdBlocks(li, item);
+      list.appendChild(li);
+    }
+    parent.appendChild(list);
+    return i;
+  }
+  function mdBlocks(parent, lines) {
+    var i = 0;
+    while (i < lines.length) {
+      var line = lines[i], m;
+      if (mdBlank(line)) { i++; continue; }
+      if ((m = MD_FENCE.exec(line))) {
+        var close = new RegExp("^ {0,3}" + (m[1][0] === "`" ? "`" : "~") + "{" + m[1].length + ",}[ \\t]*$");
+        var code = [];
+        i++;
+        while (i < lines.length && !close.test(lines[i])) { code.push(lines[i]); i++; }
+        i++;
+        var pre = el("pre");
+        pre.appendChild(el("code", null, code.join("\n")));
+        parent.appendChild(pre);
+        continue;
+      }
+      if ((m = MD_HEADING.exec(line))) {
+        parent.appendChild(mdInline(el("h" + Math.min(6, m[1].length + 2)), m[2]));
+        i++;
+        continue;
+      }
+      if (MD_RULE.test(line)) { parent.appendChild(el("hr")); i++; continue; }
+      if (MD_QUOTE.test(line)) {
+        var quoted = [];
+        while (i < lines.length && MD_QUOTE.test(lines[i])) { quoted.push(lines[i].replace(MD_QUOTE, "")); i++; }
+        var bq = el("blockquote");
+        mdBlocks(bq, quoted);
+        parent.appendChild(bq);
+        continue;
+      }
+      if (mdTableStart(lines, i)) {
+        var table = el("table"), thead = el("thead"), tbody = el("tbody"), hr = el("tr");
+        var head = mdCells(line);
+        var align = mdCells(lines[i + 1]).map(function (s) {
+          return /^:-+:$/.test(s) ? "center" : /^-+:$/.test(s) ? "right" : "";
+        });
+        var cell = function (tag, text, c) {
+          var n = mdInline(el(tag), text);
+          if (align[c]) n.style.textAlign = align[c];
+          return n;
+        };
+        head.forEach(function (text, c) { hr.appendChild(cell("th", text, c)); });
+        thead.appendChild(hr);
+        table.appendChild(thead);
+        i += 2;
+        while (i < lines.length && !mdBlank(lines[i]) && lines[i].indexOf("|") !== -1) {
+          var tr = el("tr"), cells = mdCells(lines[i]);
+          for (var c = 0; c < head.length; c++) tr.appendChild(cell("td", cells[c] || "", c));
+          tbody.appendChild(tr);
+          i++;
+        }
+        table.appendChild(tbody);
+        parent.appendChild(table);
+        continue;
+      }
+      if (MD_ITEM.test(line)) { i = mdList(parent, lines, i); continue; }
+      var p = el("p"), n = 0;
+      while (i < lines.length && !mdBlank(lines[i]) && (n === 0 || !mdBlockStart(lines, i))) {
+        if (n) p.appendChild(el("br"));
+        mdInline(p, lines[i].replace(/^\s+/, ""));
+        n++;
+        i++;
+      }
+      parent.appendChild(p);
+    }
+    return parent;
+  }
+  function renderMarkdown(text) {
+    return mdBlocks(el("div", "bb-md"), String(text).replace(/\r\n?/g, "\n").split("\n"));
+  }
   /* Warnings ride the charted feed for layout only; they are alarms, not work,
      so every count of queued work excludes them. */
   function isWarning(t) { return t && t.kind === "warning"; }
@@ -537,8 +772,7 @@ __FM_BEARINGS_BOARD_DATA__
   function scrollToSection(id) {
     var section = document.getElementById(id);
     if (!section) return;
-    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    section.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+    section.scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth", block: "start" });
   }
   stats.forEach(function (s) {
     var t = el("button", "bb-stat" + (s.call ? " bb-stat--call" : ""));
@@ -551,6 +785,51 @@ __FM_BEARINGS_BOARD_DATA__
   });
   document.getElementById("bb-call-sub").textContent =
     callTotal ? callTotal + " item" + (callTotal === 1 ? "" : "s") + " wait on you, captain" : "nothing needs you, captain";
+
+  /* Pairing: a waiting Underway row and the card that answers it name each
+     other. A card names its row by `task` (worker decision, review), by its key
+     (a decision on that task), or as merge.<task-id>. */
+  var rowIndex = Object.create(null);
+  data.underway.forEach(function (t, i) {
+    if (t && typeof t.id === "string" && !(t.id in rowIndex)) rowIndex[t.id] = i;
+  });
+  function cardTask(item) {
+    if (item.type === "steer" || item.type === "review") return item.task;
+    if (item.type === "merge") return item.key.indexOf("merge.") === 0 ? item.key.slice(6) : null;
+    return item.key;
+  }
+  function pairedRow(item) {
+    var task = cardTask(item);
+    return typeof task === "string" && task in rowIndex ? rowIndex[task] : null;
+  }
+  /* the card a row's link opens: the kind the row says it awaits, else the first */
+  function rowCard(t, i) {
+    var first = null, fit = null;
+    data.captains_call.forEach(function (item, j) {
+      if (pairedRow(item) !== i) return;
+      if (first === null) first = j;
+      var kind = item.type === "review" ? "review" : (item.type === "steer" || item.type === "decision") ? "decision" : null;
+      if (fit === null && kind && kind === t.awaits) fit = j;
+    });
+    return fit !== null ? fit : first;
+  }
+  function goToRow(i) {
+    var row = document.getElementById("bb-row-" + i);
+    if (!row) return;
+    row.scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth", block: "center" });
+    flash(row);
+  }
+  function underwayCtxRow(i) {
+    var row = el("div", "bb-ctx__row");
+    row.appendChild(el("span", "bb-ctx__k", "underway"));
+    var v = el("span", "bb-ctx__v");
+    var go = el("button", "bb-ctx__link", data.underway[i].name);
+    go.type = "button";
+    go.addEventListener("click", function () { goToRow(i); });
+    v.appendChild(go);
+    row.appendChild(v);
+    return row;
+  }
 
   /* Captain's Call deck: every item renders as the same full card */
   var deck = document.getElementById("bb-call");
@@ -581,9 +860,7 @@ __FM_BEARINGS_BOARD_DATA__
       var url = m[0].replace(/[.,;:!?)\]]+$/, "");
       if (!url.length || url === "https://") { URL_RE.lastIndex = m.index + m[0].length; continue; }
       if (m.index > last) node.appendChild(el("span", null, s.slice(last, m.index)));
-      var a = el("a", null, url);
-      a.href = url; a.target = "_blank"; a.rel = "noopener";
-      node.appendChild(a);
+      node.appendChild(linkTo(url, url, null));
       last = m.index + url.length;
       URL_RE.lastIndex = last;
     }
@@ -603,30 +880,104 @@ __FM_BEARINGS_BOARD_DATA__
       if (n) n.inert = on;
     });
   }
+  function kindBadge(item) {
+    if (item.type === "merge") return badge("online", "checks green");
+    if (item.type === "steer") return badge("info", "worker decision");
+    if (item.type === "review") return badge("warn", "review");
+    return badge("solid", item.type === "credential" ? "credential" : "decision");
+  }
+  function linkItems(list) {
+    return (Array.isArray(list) ? list : []).map(function (l) {
+      var href = safeHref(l);
+      if (!href || !l || typeof l.label !== "string" || !l.label) return null;
+      var where = href.indexOf("https://") === 0
+        ? href.replace(/^https:\/\/([^\/?#]+)[\s\S]*$/, "$1")
+        : "file · " + String(l.file || href).split("/").pop();
+      return { label: l.label, href: href, where: where };
+    }).filter(Boolean);
+  }
+  function draftItems(list) {
+    return (Array.isArray(list) ? list : []).filter(function (d) {
+      return d && typeof d.label === "string" && d.label && typeof d.text === "string" && d.text;
+    });
+  }
+  /* A draft reads as it will appear once posted; its exact source text is one
+     click away, and the file it came from opens in a new tab. */
+  function draftBox(d) {
+    var box = el("div", "bb-draft");
+    var head = el("div", "bb-draft__head");
+    head.appendChild(el("span", "bb-draft__label", d.label));
+    var toggle = el("button", "fm-btn fm-btn--sm bb-detailsbtn bb-draft__toggle", "Show source");
+    toggle.type = "button";
+    toggle.setAttribute("aria-pressed", "false");
+    head.appendChild(toggle);
+    box.appendChild(head);
+    var body = el("div", "bb-draft__body");
+    body.appendChild(renderMarkdown(d.text));
+    box.appendChild(body);
+    var src = el("pre", "bb-draft__src", d.text);
+    src.hidden = true;
+    box.appendChild(src);
+    toggle.addEventListener("click", function () {
+      var source = src.hidden;
+      src.hidden = !source;
+      body.hidden = source;
+      toggle.textContent = source ? "Show rendered" : "Show source";
+      toggle.setAttribute("aria-pressed", source ? "true" : "false");
+    });
+    var href = safeHref({ href: d.href });
+    if (href) {
+      var foot = el("p", "bb-draft__foot bb-links__where");
+      foot.appendChild(linkTo(href, "Open the draft file", "bb-modal__link"));
+      box.appendChild(foot);
+    }
+    return box;
+  }
   function openDetails(item, opener) {
     modalMeta.textContent = "";
-    if (item.type === "merge") modalMeta.appendChild(badge("online", "checks green"));
-    else modalMeta.appendChild(badge("solid", item.type === "credential" ? "credential" : "decision"));
+    modalMeta.appendChild(kindBadge(item));
     if (item.repo) modalMeta.appendChild(el("span", "bb-decision__repo", item.repo));
     modalTitle.textContent = item.title;
     modalBody.textContent = "";
 
     var ctxSec = modalSection("Context");
     var rows = el("div", "bb-ctx");
+    var rowAt = pairedRow(item);
+    if (rowAt !== null) rows.appendChild(ctxRow("underway", data.underway[rowAt].name));
     if (item.about) rows.appendChild(ctxRow("about", item.about));
     if (item.decide) rows.appendChild(ctxRow("decide", item.decide));
     if (item.type === "merge" && item.risk) rows.appendChild(ctxRow("risk", item.risk));
     if (rows.children.length) ctxSec.appendChild(rows);
     if (item.detail) ctxSec.appendChild(richText(el("p", "bb-modal__p"), item.detail));
-    if (item.pr_url) {
-      var pr = el("a", "bb-modal__link", item.pr_url);
-      pr.href = item.pr_url; pr.target = "_blank"; pr.rel = "noopener";
-      ctxSec.appendChild(pr);
-    }
+    if (item.pr_url && HTTPS_HREF.test(item.pr_url)) ctxSec.appendChild(linkTo(item.pr_url, item.pr_url, "bb-modal__link"));
     var context = paragraphs(item.context);
     context.forEach(function (p) { ctxSec.appendChild(richText(el("p", "bb-modal__p bb-modal__ctxp"), p)); });
     if (!context.length) ctxSec.appendChild(el("p", "bb-modal__none", "No further context was recorded for this call."));
     modalBody.appendChild(ctxSec);
+
+    var links = linkItems(item.links);
+    if (links.length) {
+      var linkSec = modalSection("Review these");
+      var list = el("ul", "bb-links");
+      links.forEach(function (l) {
+        var li = el("li", "bb-links__item");
+        li.appendChild(linkTo(l.href, l.label, "bb-modal__link"));
+        li.appendChild(el("span", "bb-links__where", l.where));
+        list.appendChild(li);
+      });
+      linkSec.appendChild(list);
+      modalBody.appendChild(linkSec);
+    }
+    var drafts = draftItems(item.drafts);
+    if (drafts.length) {
+      var draftSec = modalSection(drafts.length === 1 ? "Draft" : "Drafts");
+      if (item.type === "review") {
+        draftSec.appendChild(el("p", "bb-modal__opthint",
+          "Approve posts or sends exactly this text. To change it, answer in your own words instead."));
+      }
+      drafts.forEach(function (d) { draftSec.appendChild(draftBox(d)); });
+      modalBody.appendChild(draftSec);
+    }
 
     var optSec = modalSection("Options");
     item.options.forEach(function (o) {
@@ -685,23 +1036,27 @@ __FM_BEARINGS_BOARD_DATA__
       top.appendChild(badge("online", "checks green"));
       top.appendChild(badge(item.risk === "low" ? "neutral" : "warn", "risk " + item.risk));
     } else {
-      top.appendChild(badge("solid", "decision"));
+      top.appendChild(item.type === "steer" || item.type === "review" ? kindBadge(item) : badge("solid", "decision"));
       top.appendChild(el("span", "bb-decision__repo", item.repo));
     }
     pad.appendChild(top);
 
     pad.appendChild(el("h3", "bb-decision__title", item.title));
 
+    /* a card on live work names its Underway row, which scrolls into view */
+    var rowAt = pairedRow(item);
     if (item.type === "merge") {
       if (item.detail) pad.appendChild(el("p", "bb-decision__detail", item.detail));
-      if (item.pr_url) {
-        var pr = el("a", "bb-decision__link", item.pr_url);
-        pr.href = item.pr_url; pr.target = "_blank"; pr.rel = "noopener";
-        pad.appendChild(pr);
+      if (item.pr_url && HTTPS_HREF.test(item.pr_url)) pad.appendChild(linkTo(item.pr_url, item.pr_url, "bb-decision__link"));
+      if (rowAt !== null) {
+        var mctx = el("div", "bb-ctx");
+        mctx.appendChild(underwayCtxRow(rowAt));
+        pad.appendChild(mctx);
       }
     } else {
       /* the rec marker on the option itself carries the recommendation */
       var ctx = el("div", "bb-ctx");
+      if (rowAt !== null) ctx.appendChild(underwayCtxRow(rowAt));
       if (item.about) ctx.appendChild(ctxRow("about", item.about));
       if (item.decide) ctx.appendChild(ctxRow("decide", item.decide));
       pad.appendChild(ctx);
@@ -838,6 +1193,13 @@ __FM_BEARINGS_BOARD_DATA__
     fitPending = true;
     window.requestAnimationFrame(function () { fitPending = false; fitStackHeight(); });
   }
+  /* an Underway row's link deals its card to the top and scrolls to it */
+  function goToCard(i) {
+    if (!cards[i]) return;
+    showCard(i);
+    scrollToSection("bb-sec-call");
+    flash(cards[i]);
+  }
   if (cards.length) {
     stackPrev.addEventListener("click", function () { showCard(active - 1); });
     stackNext.addEventListener("click", function () { showCard(active + 1); });
@@ -857,8 +1219,9 @@ __FM_BEARINGS_BOARD_DATA__
   /* Underway */
   var uw = document.getElementById("bb-underway");
   if (!data.underway.length) uw.appendChild(el("div", "bb-empty", "Nothing is underway."));
-  data.underway.forEach(function (t) {
+  data.underway.forEach(function (t, i) {
     var row = el("div", "bb-row");
+    row.id = "bb-row-" + i;
     row.appendChild(badge(t.state === "working" ? "online" : "info", t.state));
     var main = el("div", "bb-row__main");
     /* the snapshot's durable name-or-id label leads the row so a scan says
@@ -869,6 +1232,15 @@ __FM_BEARINGS_BOARD_DATA__
     main.appendChild(el("div", "bb-row__sub",
       t.doing + " · " + t.kind + " · " + (t.repo || t.id)));
     row.appendChild(main);
+    var target = rowCard(t, i);
+    if (target !== null) {
+      var go = el("button", "bb-row__call",
+        t.awaits === "review" ? "Review" : t.awaits === "decision" ? "Decide" : "Open card");
+      go.type = "button";
+      go.setAttribute("aria-label", "Go to the Captain's Call card for " + t.name);
+      go.addEventListener("click", function () { goToCard(target); });
+      row.appendChild(go);
+    }
     uw.appendChild(row);
   });
 
@@ -884,9 +1256,9 @@ __FM_BEARINGS_BOARD_DATA__
     main.appendChild(el("div", "bb-row__title", t.what));
     main.appendChild(el("div", "bb-row__sub", (t.repo || t.id) + " · " + t.owner));
     row.appendChild(main);
-    if (t.pr_url) {
-      var a = el("a", "bb-row__pr", "#" + t.pr_url.split("/").pop());
-      a.href = t.pr_url; a.title = t.pr_url; a.target = "_blank"; a.rel = "noopener";
+    if (t.pr_url && HTTPS_HREF.test(t.pr_url)) {
+      var a = linkTo(t.pr_url, "#" + t.pr_url.split("/").pop(), "bb-row__pr");
+      a.title = t.pr_url;
       row.appendChild(a);
     }
     ld.appendChild(row);

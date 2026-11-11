@@ -225,6 +225,7 @@ Each key is reported as follows:
 
 | Key | Result |
 | --- | --- |
+| In the `merge.`, `dispatch.`, `steer.`, or `review.` namespace | Reported as `routed:` and feeds nothing, even when a task has that id: Firstmate routes these Bearings board answers itself. |
 | Names no task, names a task that is not captain-held, or names a task already closed | Reported as `skipped:` and feeds nothing. |
 | A replay whose answer and requested close mode match the newest record | An idempotent `closed:`. |
 | A replay with a mode mismatch | Skipped. |
@@ -629,6 +630,7 @@ The captured-source coverage proves:
 - The generic runner creates a request only through a verified bound source.
 - Chat reconcile text creates none.
 - The resulting board request authorizes evidence-backed closure.
+- A board-routed merge, dispatch, worker-decision, or review key never resolves a captain-held task, even one whose id matches it.
 
 ### Board suite
 

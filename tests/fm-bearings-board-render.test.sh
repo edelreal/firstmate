@@ -93,8 +93,8 @@ require_listener_reached_poll() {  # <home>
 }
 
 # Build the board from <underway-json> plus <charted-json> and return what the
-# renderer produced.
-render_board() {  # <home> <underway-json> <charted-json> [charted_more] [charted_warning_more] [calls-json]
+# renderer produced; <answers-json> names cards for the harness to answer last.
+render_board() {  # <home> <underway-json> <charted-json> [charted_more] [charted_warning_more] [calls-json] [answers-json]
   local home=$1 underway=$2 charted=$3 more=${4:-0} warning_more=${5:-0} data="$1/payload.json"
   jq -n --argjson underway "$underway" --argjson charted "$charted" \
     --argjson more "$more" --argjson warning_more "$warning_more" --argjson calls "${6:-[]}" '{
@@ -107,8 +107,160 @@ render_board() {  # <home> <underway-json> <charted-json> [charted_more] [charte
     LAVISH_AXI_STATE_DIR="$home/lavish-state" \
     "$BOARD" build "$data" >/dev/null || fail "the board did not build"
   require_listener_reached_poll "$home"
-  node "$HARNESS" "$home/.lavish/bearings-board.html" \
+  node "$HARNESS" "$home/.lavish/bearings-board.html" "${7:-[]}" \
     || fail "the built board could not be rendered"
+}
+
+# Two live tasks wait on the captain, after a merge card on other work: one
+# worker asks a question, and one draft PR awaits review with a demo, a test
+# plan, and a Linear comment to approve.
+WAITING_UNDERWAY='[
+  {"id":"other-ship","repo":"sample","name":"Other ship","state":"working","kind":"ship","doing":"PR green"},
+  {"id":"eng-709-review-fixes","repo":"joist","name":"ENG-709 review fixes","state":"awaits decision",
+   "awaits":"decision","kind":"ship","doing":"asks for the overlay batch cap"},
+  {"id":"eng-709-draft-pr","repo":"joist","name":"ENG-709 draft PR","state":"awaits review",
+   "awaits":"review","kind":"ship","doing":"draft PR awaits review"}
+]'
+waiting_calls() {  # <artifact-dir>
+  local dir=$1
+  mkdir -p "$dir"
+  printf 'fake mp4 bytes\n' > "$dir/demo.mp4"
+  printf '# Test plan\n\n- case one\n' > "$dir/test-plan.md"
+  cat > "$dir/linear-comment.md" <<'EOF'
+### Summary
+
+Caps overlay **batches**; see https://github.com/example/joist/pull/796.
+Second line of the same paragraph.
+
+- one
+- two
+  - nested `item`
+
+1. first
+2. second
+
+| Case | Result |
+| --- | :-: |
+| A \| B | pass |
+
+```sh
+echo <b>not markup</b>
+```
+
+[not a link](javascript:alert(1)) and <i>raw</i>
+EOF
+  jq -n --arg dir "$dir" '[
+    {key:"merge.other-ship", type:"merge", repo:"sample", title:"Merge: other ship", risk:"low",
+     options:[{value:"merge",label:"Merge now"}]},
+    {key:"steer.eng-709-review-fixes.batch-overlay-cap", type:"steer", task:"eng-709-review-fixes",
+     decision_key:"batch-overlay-cap", repo:"joist", title:"Overlay batch size",
+     about:"The worker asks how many overlays one batch may carry.", decide:"Cap at 50 or 100?",
+     context:["Joist renders overlays in batches."],
+     options:[{value:"cap-50",label:"Cap at 50",details:["Matches the API limit."]},
+              {value:"cap-100",label:"Cap at 100"}],
+     recommend_value:"cap-50", allow_freeform:true},
+    {key:"review.eng-709-draft-pr", type:"review", task:"eng-709-draft-pr", repo:"joist",
+     title:"Review the ENG-709 draft PR", about:"The draft PR, its demo, and a Linear comment.",
+     decide:"Approve and post, or say what to change.",
+     options:[{value:"approve",label:"Approve and post"}], allow_freeform:true,
+     links:[{label:"Draft PR", url:"https://github.com/example/joist/pull/796"},
+            {label:"Demo video", file:($dir + "/demo.mp4")},
+            {label:"Test plan", file:($dir + "/test-plan.md")}],
+     drafts:[{label:"Linear comment on ENG-709", file:($dir + "/linear-comment.md")}]}
+  ]'
+}
+
+test_waiting_rows_and_their_cards_point_at_each_other() {
+  local home out
+  home=$(make_home waiting-pairs)
+  out=$(render_board "$home" "$WAITING_UNDERWAY" '[]' 0 0 "$(waiting_calls "$home/artifacts")")
+  printf '%s' "$out" | jq -e '.error == ""' >/dev/null \
+    || fail "the board rendered its fail-closed error instead of the fleet: $out"
+  printf '%s' "$out" | jq -e '
+    [.underway[] | .call] == ["Open card", "Decide", "Review"]
+      and .row_links == [
+        {row:"Other ship", label:"Open card", shown:["Merge: other ship"], scrolls_to:["bb-sec-call"], prompts:0},
+        {row:"ENG-709 review fixes", label:"Decide", shown:["Overlay batch size"], scrolls_to:["bb-sec-call"], prompts:0},
+        {row:"ENG-709 draft PR", label:"Review", shown:["Review the ENG-709 draft PR"], scrolls_to:["bb-sec-call"], prompts:0}]
+  ' >/dev/null || fail "a waiting Underway row did not link to and deal its own card: $out"
+  printf '%s' "$out" | jq -e '
+    .card_rows == [
+      {card:"Merge: other ship", underway:"Other ship", scrolls_to:["bb-row-0"], prompts:0},
+      {card:"Overlay batch size", underway:"ENG-709 review fixes", scrolls_to:["bb-row-1"], prompts:0},
+      {card:"Review the ENG-709 draft PR", underway:"ENG-709 draft PR", scrolls_to:["bb-row-2"], prompts:0}]
+      and ([.call.details[] | .badges] == [["checks green"], ["worker decision"], ["review"]])
+      and (.call.details[1].ctx_rows[0] == ["underway", "ENG-709 review fixes"])
+      and (.call.details[2].ctx_rows[0] == ["underway", "ENG-709 draft PR"])
+  ' >/dev/null || fail "a card did not name and scroll to its own Underway row: $out"
+  pass "a waiting Underway row and its card link to each other without queuing anything"
+}
+
+test_worker_decision_and_review_answers_queue_their_own_keys() {
+  local home out
+  home=$(make_home waiting-answers)
+  out=$(render_board "$home" "$WAITING_UNDERWAY" '[]' 0 0 "$(waiting_calls "$home/artifacts")" '[
+    {"key":"steer.eng-709-review-fixes.batch-overlay-cap","value":"cap-50","note":"keep the API limit"},
+    {"key":"review.eng-709-draft-pr","value":"approve"},
+    {"key":"review.eng-709-draft-pr","note":"Tighten the summary first"}]')
+  printf '%s' "$out" | jq -e '
+    (.call.details | all(.prompts == 0 and .link_prompts == 0))
+      and ([.answers[] | .found] == [true, true, true])
+      and ([.answers[] | .prompts | length] == [1, 1, 1])
+      and ([.answers[] | .prompts[0] | .tag] == ["choice", "choice", "choice"])
+      and ([.answers[] | .prompts[0].data] == [
+        {schema:"fm-bearings-answer.v1", question:"steer.eng-709-review-fixes.batch-overlay-cap",
+         selection:"cap-50", note:"keep the API limit"},
+        {schema:"fm-bearings-answer.v1", question:"review.eng-709-draft-pr", selection:"approve", note:""},
+        {schema:"fm-bearings-answer.v1", question:"review.eng-709-draft-pr", selection:"",
+         note:"Tighten the summary first"}])
+  ' >/dev/null || fail "a worker-decision or review answer did not queue its own key and words: $out"
+  printf '%s' "$out" | jq -e '
+    (.call.details[1].options | map(.label)) == ["Cap at 50", "Cap at 100"]
+      and (.call.details[2].options | map(.label)) == ["Approve and post"]
+  ' >/dev/null || fail "a worker-decision or review card gained an option it was not given: $out"
+  pass "worker-decision and review answers queue their own keys, and only answering queues anything"
+}
+
+test_review_details_show_links_and_a_rendered_draft_with_its_source() {
+  local home out href
+  home=$(make_home review-details)
+  out=$(render_board "$home" "$WAITING_UNDERWAY" '[]' 0 0 "$(waiting_calls "$home/artifacts")")
+  printf '%s' "$out" | jq -e '
+    .call.details[2] as $d
+    | ($d.link_items | map({text, target, follows})) == [
+        {text:"Draft PR", target:"_blank", follows:true},
+        {text:"Demo video", target:"_blank", follows:true},
+        {text:"Test plan", target:"_blank", follows:true}]
+      and $d.link_items[0].href == "https://github.com/example/joist/pull/796"
+      and $d.link_items[0].where == "github.com"
+      and ($d.link_items[1:] | all(.href | test("^bearings-board-files/[A-Za-z0-9._-]+$")))
+      and ($d.link_items[1].href | endswith(".html"))
+      and all($d.anchors[]; .target == "_blank" and .follows
+        and (.href | test("^(https://|bearings-board-files/)")))
+      and $d.link_prompts == 0 and $d.prompts == 0
+  ' >/dev/null || fail "the review Details did not link its artifacts in new tabs: $out"
+  # Every local link opens a file that really is beside the built board.
+  for href in $(printf '%s' "$out" | jq -r '.call.details[2] | .link_items[1:][].href, .drafts[0].file[0].href'); do
+    assert_present "$home/.lavish/$href" "the Details link $href opens nothing beside the board"
+  done
+  printf '%s' "$out" | jq -e --rawfile source "$home/artifacts/linear-comment.md" '
+    .call.details[2].drafts as $drafts
+    | ($drafts | length) == 1
+      and ($drafts[0] | .label == "Linear comment on ENG-709"
+        and .source == $source
+        and .before == {rendered:true, source:false, toggle:"Show source"}
+        and .after == {rendered:false, source:true, toggle:"Show rendered"}
+        and .restored == .before
+        and ([.rendered.tags[] | select(. == "h5" or . == "ul" or . == "ol" or . == "table"
+            or . == "pre" or . == "strong" or . == "br")] | unique)
+          == ["br", "h5", "ol", "pre", "strong", "table", "ul"]
+        and .rendered.list_items == ["one", "twonested item", "nested item", "first", "second"]
+        and .rendered.table == [["th:Case", "th:Result"], ["td:A | B", "td:pass"]]
+        and .rendered.code == ["echo <b>not markup</b>"]
+        and (.rendered.links | map(.href)) == ["https://github.com/example/joist/pull/796"]
+        and (.rendered.text | contains("[not a link](javascript:alert(1)) and <i>raw</i>")))
+  ' >/dev/null || fail "the draft did not render as Markdown with its exact source one click away: $out"
+  pass "review Details link every artifact in a new tab and render the draft with its exact source"
 }
 
 # Build the board from <charted-json> alone and return what the renderer produced.
@@ -404,6 +556,9 @@ EOF
 }
 
 test_full_snapshot_question_reaches_the_rendered_decision
+test_waiting_rows_and_their_cards_point_at_each_other
+test_worker_decision_and_review_answers_queue_their_own_keys
+test_review_details_show_links_and_a_rendered_draft_with_its_source
 test_every_captains_call_card_takes_the_tallest_cards_height
 test_every_captains_call_card_opens_a_full_screen_details_view
 test_an_empty_captains_call_still_shows_its_empty_state

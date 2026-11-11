@@ -182,6 +182,49 @@ write_valid_payload() {  # <path>
 EOF
 }
 
+# Two live tasks wait on the captain: one worker asks a question, one awaits
+# review of its draft PR, a demo, a test plan, and an outward draft.
+write_paired_payload() {  # <path> <artifact-dir>
+  local dir=$2
+  mkdir -p "$dir"
+  printf '# Test plan\n\n- case one\n' > "$dir/test plan.md"
+  printf 'fake mp4 bytes\n' > "$dir/demo.mp4"
+  printf 'Fixes overlay batching.\n\n- capped at 50\n' > "$dir/linear-comment.md"
+  jq -n --arg dir "$dir" '{
+    schema:"fm-bearings-board.v1", home:"test-home", generated:"2026-11-11T00:00Z", prs_live:false,
+    captains_call:[
+      {key:"steer.eng-709-review-fixes.batch-overlay-cap", type:"steer", task:"eng-709-review-fixes",
+       decision_key:"batch-overlay-cap", repo:"joist", title:"Overlay batch size",
+       options:[{value:"cap-50",label:"Cap at 50"},{value:"cap-100",label:"Cap at 100"}],
+       allow_freeform:true},
+      {key:"review.eng-709-draft-pr", type:"review", task:"eng-709-draft-pr", repo:"joist",
+       title:"Review the ENG-709 draft PR", options:[{value:"approve",label:"Approve and post"}],
+       allow_freeform:true,
+       links:[{label:"Draft PR", url:"https://github.com/example/joist/pull/796"},
+              {label:"Demo video", file:($dir + "/demo.mp4")},
+              {label:"Test plan", file:($dir + "/test plan.md")}],
+       drafts:[{label:"Linear comment on ENG-709", file:($dir + "/linear-comment.md")},
+               {label:"Slack reply", text:"Shipped *today*."}]}],
+    underway:[
+      {id:"eng-709-review-fixes", repo:"joist", name:"ENG-709 review fixes", state:"awaits decision",
+       awaits:"decision", doing:"asks for the overlay batch cap", kind:"ship"},
+      {id:"eng-709-draft-pr", repo:"joist", name:"ENG-709 draft PR", state:"awaits review",
+       awaits:"review", doing:"draft PR awaits review", kind:"ship"}],
+    landed:[], charted:[]}' > "$1"
+}
+
+# Expect build to refuse <data>, leave no board, and say <reason> on stderr.
+assert_build_refuses() {  # <home> <data> <what> [<reason>]
+  local out rc
+  set +e
+  out=$(run_board "$1" build "$2" 2>&1)
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "build accepted $3"
+  assert_absent "$1/.lavish/bearings-board.html" "build published a board for $3"
+  [ -z "${4-}" ] || assert_contains "$out" "$4" "the refusal of $3 did not say why: $out"
+}
+
 # Extract the injected payload back out of a built board page.
 extract_payload() {  # <board-path>
   sed -n '/<script id="bearings-data" type="application\/json">/,/<\/script>/p' "$1" \
@@ -782,8 +825,113 @@ test_build_refuses_a_nondecision_reconcile_value() {
   pass "build reserves reconcile across non-decision cards"
 }
 
+test_build_refuses_unpaired_rows_and_unsafe_links() {
+  local home data dir edit
+  home=$(make_home pairing-refusals)
+  data="$home/payload.json"
+  dir="$home/artifacts"
+
+  write_paired_payload "$data" "$dir"
+  jq '.captains_call |= map(select(.type != "steer"))' "$data" > "$data.tmp" && mv "$data.tmp" "$data"
+  assert_build_refuses "$home" "$data" "a row awaiting a decision with no card" \
+    "eng-709-review-fixes awaits a decision"
+
+  write_paired_payload "$data" "$dir"
+  jq '.captains_call |= map(select(.type != "review"))' "$data" > "$data.tmp" && mv "$data.tmp" "$data"
+  assert_build_refuses "$home" "$data" "a row awaiting a review with no card" \
+    "eng-709-draft-pr awaits a review"
+
+  write_paired_payload "$data" "$dir"
+  jq '.underway |= map(select(.id != "eng-709-draft-pr"))' "$data" > "$data.tmp" && mv "$data.tmp" "$data"
+  assert_build_refuses "$home" "$data" "a review card that names no Underway row" \
+    "review.eng-709-draft-pr names no Underway row"
+
+  for edit in \
+    '.captains_call[1].links[0].url = "http://github.com/example/joist/pull/796"' \
+    '.captains_call[1].links[0].url = "file:///etc/passwd"' \
+    '.captains_call[1].links[0].url = "javascript:alert(1)"' \
+    '.captains_call[1].links[1].file = "relative/demo.mp4"' \
+    '.captains_call[1].links[1].file = "file:///tmp/demo.mp4"' \
+    '.captains_call[1].links[0].file = "/tmp/demo.mp4"' \
+    '.captains_call[1].links[0].href = "javascript:alert(1)"' \
+    '.captains_call[1].links[0] = {label:"No target"}' \
+    '.captains_call[1].links = []' \
+    '.captains_call[1].drafts[1].href = "bearings-board-files/x"' \
+    '.captains_call[1].drafts[1].text = ""' \
+    '.captains_call[0].key = "steer.eng-709-review-fixes.other-key"' \
+    '.captains_call[0].allow_freeform = false' \
+    '.captains_call[0].close = "release"' \
+    '.captains_call[1].key = "review.eng-709-review-fixes"' \
+    '.captains_call[1].options += [{value:"reject",label:"Reject"}]' \
+    '.underway[0].awaits = "merge"'; do
+    write_paired_payload "$data" "$dir"
+    jq "$edit" "$data" > "$data.tmp" && mv "$data.tmp" "$data"
+    assert_build_refuses "$home" "$data" "the payload edited by: $edit"
+  done
+
+  write_paired_payload "$data" "$dir"
+  rm -f "$dir/demo.mp4"
+  assert_build_refuses "$home" "$data" "a link to a missing local file" "$dir/demo.mp4"
+
+  write_paired_payload "$data" "$dir"
+  printf '\377\376 not utf-8\n' > "$dir/linear-comment.md"
+  assert_build_refuses "$home" "$data" "a draft file that is not UTF-8 text" "$dir/linear-comment.md"
+  pass "build refuses an unpaired waiting row or card and any link that is not https or a local file"
+}
+
+test_build_places_linked_files_beside_the_board() {
+  local home data dir board files payload href mp4 player plan draft
+  home=$(make_home linked-files)
+  data="$home/payload.json"
+  dir="$home/artifacts"
+  board="$home/.lavish/bearings-board.html"
+  files="$home/.lavish/bearings-board-files"
+  write_paired_payload "$data" "$dir"
+  run_board "$home" build "$data" >/dev/null || fail "a payload with linked files did not build"
+  payload=$(extract_payload "$board")
+
+  # Every https link stays as given; every local file is reachable beside the
+  # board through the href the template opens, with the source's exact bytes.
+  printf '%s' "$payload" | jq -e '
+    .captains_call[1].links[0] == {label:"Draft PR", url:"https://github.com/example/joist/pull/796"}
+      and all(.captains_call[1].links[1:][]; .href | test("^bearings-board-files/[A-Za-z0-9._-]+$"))
+      and (.captains_call[1].drafts[0].href | test("^bearings-board-files/[A-Za-z0-9._-]+$"))
+  ' >/dev/null || fail "the built payload did not link every file beside the board: $payload"
+  plan=$(printf '%s' "$payload" | jq -r '.captains_call[1].links[2].href')
+  assert_present "$home/.lavish/$plan" "the test plan link names no file beside the board"
+  cmp -s "$dir/test plan.md" "$home/.lavish/$plan" || fail "the test plan beside the board is not the source's bytes"
+
+  # A video link opens a player page that plays the copy beside it.
+  player=$(printf '%s' "$payload" | jq -r '.captains_call[1].links[1].href')
+  assert_present "$home/.lavish/$player" "the demo video link names no player page beside the board"
+  mp4=${player%.html}
+  cmp -s "$dir/demo.mp4" "$home/.lavish/$mp4" || fail "the demo video beside the board is not the source's bytes"
+  grep -qF "<video controls preload=\"metadata\" src=\"${mp4##*/}\">" "$home/.lavish/$player" \
+    || fail "the player page does not play the demo video beside it"
+
+  # A draft file becomes the exact text the board renders, kept as a copy.
+  draft=$(printf '%s' "$payload" | jq -r '.captains_call[1].drafts[0].href')
+  printf '%s' "$payload" | jq -e --rawfile text "$dir/linear-comment.md" '
+    .captains_call[1].drafts[0].text == $text
+      and .captains_call[1].drafts[1] == {label:"Slack reply", text:"Shipped *today*."}
+  ' >/dev/null || fail "the draft file did not become the board's exact draft text: $payload"
+  cmp -s "$dir/linear-comment.md" "$home/.lavish/$draft" || fail "the draft copy is not the source's bytes"
+  printf 'edited later\n' >> "$dir/linear-comment.md"
+  cmp -s "$dir/linear-comment.md" "$home/.lavish/$draft" \
+    && fail "editing the draft source also changed the board's copy"
+
+  # A rebuild without those links leaves none of the old files behind.
+  jq '.captains_call[1] |= del(.links, .drafts)' "$data" > "$data.tmp" && mv "$data.tmp" "$data"
+  run_board "$home" build "$data" >/dev/null || fail "the rebuild without links failed"
+  [ -d "$files" ] || fail "the rebuild removed the linked-files folder itself"
+  [ -z "$(ls -A "$files")" ] || fail "a rebuild left earlier linked files beside the board: $(ls -A "$files")"
+  pass "build places every linked and draft file beside the board where its link opens it"
+}
+
 test_path_is_stable_and_home_scoped
 test_build_refuses_malformed_payloads_before_touching_the_board
+test_build_refuses_unpaired_rows_and_unsafe_links
+test_build_places_linked_files_beside_the_board
 test_charted_kind_is_optional_and_accepts_both_values
 test_build_injects_binds_then_arms
 test_registration_cannot_consume_before_any_origin_binding

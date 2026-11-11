@@ -1125,6 +1125,36 @@ test_open_decision_surfaces_end_to_end() {
   pass "an authoritative captain hold surfaces end-to-end"
 }
 
+# A live worker's own open question surfaces under the decision key that answers
+# it, so a board can card it; a working pane's stale question does not.
+test_worker_decision_keys_surface_for_underway_rows() {
+  local home fakebin json backlog
+  home=$(make_home worker-decision); write_fixture "$home"
+  backlog="$home/data/backlog.md"
+  awk '{ print } /^## In flight$/ { print "- [ ] asking-task - Ask the captain (repo: firstmate) (kind: ship) (since 2026-07-11)" }' \
+    "$backlog" > "$backlog.tmp" && mv "$backlog.tmp" "$backlog"
+  fm_write_meta "$home/state/asking-task.meta" \
+    "window=firstmate:fm-asking-task" \
+    "worktree=$home/projects/ship-wt" \
+    "project=firstmate" \
+    "harness=claude" \
+    "kind=ship" \
+    "mode=no-mistakes"
+  record_claude_state "$home/state" asking-task idle
+  printf 'working: building\nneeds-decision [key=batch-overlay-cap]: cap overlay batches at 50 or 100?\n' \
+    > "$home/state/asking-task.status"
+  printf 'needs-decision [key=stale-ask]: an old question\n' >> "$home/state/ship-task.status"
+  fakebin=$(make_fakebin "$home")
+  json=$(run "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    (.in_flight | any(.id == "asking-task"))
+      and ([.worker_decisions[] | select(.id == "asking-task")]
+        == [{id:"asking-task", key:"batch-overlay-cap", summary:"cap overlay batches at 50 or 100?"}])
+      and ([.worker_decisions[] | select(.id == "ship-task")] == [])
+  ' >/dev/null || fail "a live worker question did not surface under its decision key: $json"
+  pass "an Underway worker's open question surfaces with its decision key"
+}
+
 test_report_pointers_surface() {
   local home fakebin json
   home=$(make_home reports); write_fixture "$home"
@@ -3501,6 +3531,7 @@ fm_test_run \
   test_main_captain_readiness_matches_secondmate_projection \
   test_completed_scout_report_not_pending \
   test_open_decision_surfaces_end_to_end \
+  test_worker_decision_keys_surface_for_underway_rows \
   test_report_pointers_surface \
   test_queued_item_prose_never_hides_it \
   test_include_prs_is_the_only_fetch_path \

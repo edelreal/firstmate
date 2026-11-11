@@ -1923,6 +1923,41 @@ SH
 # reserved at the one keyed-answer intake, so no channel and no card-declared
 # close mode can turn it into a close or a release, and the obligation to verify
 # survives as a durable request instead of evaporating with the wake.
+# A Bearings board merge order, dispatch pick, worker decision, or review is
+# Firstmate's to route. Its key never resolves a captain-held task, even one a
+# backlog happens to name with that exact id.
+test_board_routed_keys_never_resolve_a_captain_hold() {
+  local home out rc key show
+  home=$(make_home board-routed-keys)
+  for key in review.sample-held steer.sample-worker.batch-cap merge.sample-ship dispatch.charted; do
+    tasks_in "$home" add "$key" "Captain call named like a board key" --repo sample >/dev/null \
+      || fail "could not create the $key fixture"
+    run_captain "$home" hold "$key" --reason "captain choice pending" >/dev/null \
+      || fail "could not hold the $key fixture"
+  done
+
+  set +e
+  out=$(printf '%s\n' \
+    "$(printf 'review.sample-held\tapprove\tReview -> approve')" \
+    "$(printf 'steer.sample-worker.batch-cap\tcap-50\tBatch cap -> cap-50')" \
+    "$(printf 'merge.sample-ship\tmerge\tMerge -> merge')" \
+    "$(printf 'dispatch.charted\tsample-a,sample-b\tDispatch')" \
+    | run_captain "$home" answers --source "board sequence 1" 2>&1)
+  rc=$?
+  set -e
+  [ "$rc" -eq 0 ] || fail "routed board keys were counted as skipped answers: $out"
+  for key in review.sample-held steer.sample-worker.batch-cap merge.sample-ship dispatch.charted; do
+    assert_contains "$out" "routed: $key" "the intake did not report $key as Firstmate-routed: $out"
+    show=$(tasks_in "$home" show "$key" --full)
+    assert_contains "$show" "state: queued" "a routed board key completed the captain call $key"
+    assert_contains "$show" "held: yes" "a routed board key released the captain call $key"
+  done
+  case "$out" in
+    *"closed: "*) fail "a routed board key closed a captain call: $out" ;;
+  esac
+  pass "board-routed keys never resolve a captain-held task, even one with the same id"
+}
+
 test_reconcile_never_closes_through_the_keyed_answer_intake() {
   local home out rc show list
   home=$(make_home reconcile-intake)
@@ -5144,6 +5179,7 @@ test_secondmate_hold_stays_in_authoritative_home
 test_secondmate_home_publishes_holds_and_answers
 test_secondmate_reconcile_publishes_before_request_retirement
 test_bound_channel_answers_close_at_answer_time
+test_board_routed_keys_never_resolve_a_captain_hold
 test_reconcile_never_closes_through_the_keyed_answer_intake
 test_normal_answers_retire_pending_reconcile_requests
 test_reconcile_closes_with_evidence_or_keeps_the_call_open

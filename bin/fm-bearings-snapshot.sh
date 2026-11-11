@@ -35,6 +35,9 @@
 # captain_decision because it has an open
 # captain hold still contributes each working child as its own Underway row;
 # the home row on secondmates[] keeps the decision and gate classification.
+# worker_decisions lists every open needs-decision of a shown main-home Underway
+# row from the canonical hints.open_decisions fold, with its decision key, so a
+# board can card a worker's own question under the key that answers it.
 # Captain-hold placement follows the canonical snapshot's hold_bucket and
 # nothing else; this wrapper never inspects hold reason or body prose. The
 # buckets are total and mutually exclusive, so every captain hold appears in
@@ -148,6 +151,7 @@ remote homes under one shared snapshot budget and may refresh the parent-side ca
 --include-prs additionally performs live GitHub discovery and checks.
 
 Default fields: schema, home, generated, prs, in_flight{id,kind,state,repo,name,doing},
+  worker_decisions{id,key,summary} (open needs-decision keys of shown in_flight rows),
   secondmates{id,state,doing,provenance,freshness,age_seconds,contradiction,reason},
   secondmate_reconcile{id,spawn_gen,host,kind,ids},
   decisions_open{id,key,verb,summary,question,owner}, landed{id,what,artifact,owner},
@@ -526,6 +530,14 @@ MODEL=$(printf '%s' "$SNAP" | jq \
                   | (if (($name | type) == "string" and ($name | test("[^[:space:]]")))
                      then $name else ($m.id + "/" + .id) end) | trunc(70)),
             doing:((.doing // .state) | trunc(90))} ]) as $in_flight_all
+  | ([ .tasks[]
+       | select(.kind != "secondmate")
+       | select(.backlog.current_role != "program")
+       | select(.backlog.current_role != "held" or .current_state.state == "working")
+       | .id as $id
+       | (.hints.open_decisions // [])[]
+       | select(.verb == "needs-decision")
+       | {id:$id, key, summary:(.summary | trunc(160))} ]) as $worker_decisions_all
   | ([ .backlog.records[]
          | . as $record
          | select(.structured and .hold_bucket != null)
@@ -643,6 +655,9 @@ MODEL=$(printf '%s' "$SNAP" | jq \
            captain_omitted:([$measured[].captain_omitted] | add // 0),
            captain:[$measured[] as $h | $h.captain[]? | . + {owner:$h.owner}]}),
       in_flight: (if $all_in_flight == 1 then $in_flight_all else $in_flight_all[:$in_flight_n] end),
+      worker_decisions: ((if $all_in_flight == 1 then $in_flight_all else $in_flight_all[:$in_flight_n] end
+                          | map(.id)) as $shown
+                         | [$worker_decisions_all[] | select(.id as $id | $shown | index($id) != null)]),
       secondmates: (if $all_secondmates == 1 then $secondmates_all else $secondmates_all[:$secondmates_n] end),
       secondmate_reconcile: [ (.secondmate_current.records // [])[]
         | select(.reconcile_inventory != null)

@@ -10,7 +10,9 @@
 # build that trusted the exit status armed a poll against a dead session and the
 # board read "not listening" with nobody watching it. A stubbed lavish-axi can
 # only confirm the assumption already written into the stub, so the assumption
-# itself needs a run against the real tool.
+# itself needs a run against the real tool. The board's local links rest on one
+# more vendor fact guarded here: the server serves a file the build placed in
+# the folder beside the board.
 #
 # The captain-ended state is reached through the same server route the browser's
 # End session button calls, so no browser is needed and nothing here depends on
@@ -73,6 +75,9 @@ cat > "$LAB/payload.json" <<'JSON'
   "charted": []
 }
 JSON
+printf '# Served beside the board\n' > "$LAB/served.md"
+jq --arg file "$LAB/served.md" '.captains_call[0].links = [{label:"Served file", file:$file}]' \
+  "$LAB/payload.json" > "$LAB/payload.tmp" && mv "$LAB/payload.tmp" "$LAB/payload.json"
 
 run_board() {
   FM_HOME="$LAB" FM_STATE_OVERRIDE="$LAB/state" FM_DATA_OVERRIDE="$LAB/data" \
@@ -91,6 +96,16 @@ case "$url" in
 esac
 key=${url##*/}
 base=${url%/session/*}
+
+# ASSUMPTION UNDER GUARD: Lavish serves the board's own directory, so a linked
+# local file the build placed beside the board opens from the session's route.
+href=$(sed -n '/<script id="bearings-data" type="application\/json">/,/<\/script>/p' "$BOARD" \
+  | sed '1d;$d' | jq -r '.captains_call[0].links[0].href')
+served=$(curl -fsS "$base/artifact/$key/$href" 2>/dev/null) \
+  || fail "lavish-axi ${VERSION:-version-unknown} does not serve $href beside the board; the board's local links must be revisited"
+[ "$served" = "$(cat "$LAB/served.md")" ] \
+  || fail "lavish-axi ${VERSION:-version-unknown} served different bytes for $href than the linked file"
+pass "lavish-axi ${VERSION:-version-unknown} serves a linked file the board build placed beside the board"
 
 # End it exactly as the browser's End session button does.
 curl -fsS -X POST "$base/api/$key/end" >/dev/null 2>&1 \
