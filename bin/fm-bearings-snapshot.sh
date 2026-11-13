@@ -17,10 +17,19 @@
 # for registered remote homes under one shared collection budget and may atomically
 # refresh its parent-side ledger cache. It MAY surface PR URLs already recorded in
 # task meta (recorded_prs), but performs no live GitHub discovery or checks. Live PR
-# discovery/checks happen ONLY under --include-prs; all gh coupling lives in that
-# branch and never in the canonical snapshot. The default output states explicitly
+# discovery/checks happen ONLY under --include-prs; all gh coupling lives in this
+# wrapper and never in the canonical snapshot. The default output states explicitly
 # (the prs: line and the omitted[] surfaces) what was not requested, so an absence is
 # never ambiguous.
+# The one default gh read is a captain call's own PR, never discovery: the captain
+# settles a PR-bound call on the forge, where no fleet record sees it, so each live
+# main-home captain hold whose backlog row carries a GitHub PR URL gets one bounded
+# `gh pr view` (at most FM_BEARINGS_DECISIONS of them). A call that PR already
+# settled - merged, closed, or (for a non-ship call, since a ship's call is its
+# merge) the gh user's latest approve or request-changes review on the current head
+# at or after the hold's full `Captain hold set:` timestamp - leaves Captain's Call
+# for a Charted Next gate whose reason starts `PR <what> <when>`. A PR that cannot
+# be read keeps its call live, disclosed in omitted[].
 #
 # This wrapper consumes canonical status decisions plus canonically normalized
 # backlog roles, unresolved blockers, and captain actionability.
@@ -38,14 +47,16 @@
 # worker_decisions lists every open needs-decision of a shown main-home Underway
 # row from the canonical hints.open_decisions fold, with its decision key, so a
 # board can card a worker's own question under the key that answers it.
-# Captain-hold placement follows the canonical snapshot's hold_bucket and
-# nothing else; this wrapper never inspects hold reason or body prose. The
+# Captain-hold placement follows the canonical snapshot's hold_bucket and the
+# live PR read above, nothing else; this wrapper never inspects hold reason or
+# body prose. The
 # buckets are total and mutually exclusive, so every captain hold appears in
 # exactly one decision bucket and none can fall through both. An actively worked
 # held task may also appear in Underway. A "live" hold is a default Captain's Call
-# entry; "blocked", "dated", and "aged" leave the default Captain's Call, render
-# as Charted Next gates stating why (the blocking work, the until date, or the
-# floored age), and are counted in omitted[].
+# entry; "blocked", "dated", and "aged" holds and a live hold its PR settled leave
+# the default Captain's Call, render as Charted Next gates stating why (the
+# blocking work, the until date, the floored age, or what happened to the PR),
+# and are counted in omitted[].
 # --all-decisions reveals every captain hold available within the bounded snapshot
 # and drops its gate, so a hold is never in both Captain's Call and Charted Next.
 # Aging is a projection safety net only; the durable
@@ -149,12 +160,16 @@ Compact bearings projection over fm-fleet-snapshot.sh. TOON by default.
 Default collection performs bounded concurrent remote-ledger reads for registered
 remote homes under one shared snapshot budget and may refresh the parent-side cache.
 --include-prs additionally performs live GitHub discovery and checks.
+Each live main-home captain call whose backlog row names a GitHub PR gets one
+  bounded live read; a call that PR already settled (merged, closed, or for a
+  non-ship call the gh user's approve or request-changes review on the current
+  head since the hold was set) moves to gates with a "PR <what> <when>" reason.
 
 Default fields: schema, home, generated, prs, in_flight{id,kind,state,repo,name,doing},
   worker_decisions{id,key,summary} (open needs-decision keys of shown in_flight rows),
   secondmates{id,state,doing,provenance,freshness,age_seconds,contradiction,reason},
   secondmate_reconcile{id,spawn_gen,host,kind,ids},
-  decisions_open{id,key,verb,summary,question,owner}, landed{id,what,artifact,owner},
+  decisions_open{id,key,verb,summary,question,owner,pr_url}, landed{id,what,artifact,owner},
   gates{id,title,blocked_by,reason,owner,filed}, reports{id,path}, recorded_prs{id,url},
   unhealthy_endpoints{...} (only when non-empty), omitted{surface,reveal}.
 Default gates are selected newest filed first before their bound; undated gates
@@ -353,6 +368,59 @@ EOF
   fi
 fi
 
+# --- live state of each live captain call's own PR ---------------------------
+# The header owns what settles a call. CALL_PRS maps each read call's task id to
+# {url, done}; CALL_PR_UNREAD counts the calls whose PR could not be read.
+CALL_PRS='{}'
+CALL_PR_UNREAD=0
+CALL_ROWS=$(printf '%s' "$SNAP" | jq -c '
+  [.backlog.records[]
+   | select(.structured and .hold_bucket == "live" and ((.pr_url // null) | type) == "string")
+   | (.pr_url | capture("^(?<u>https://github\\.com/[^/[:space:]]+/[^/[:space:]]+/pull/[0-9]+)") | .u) as $url
+   | {id, url:$url, hold_set:(.hold_set // ""), ship:(.kind == "ship")}]') \
+  || { echo "fm-bearings-snapshot: cannot select captain calls with a PR" >&2; exit 1; }
+if [ "$CALL_ROWS" != '[]' ]; then
+  CALL_VIEWER=''
+  if command -v gh >/dev/null 2>&1; then
+    CALL_VIEWER=$(gh_bounded api user --jq .login 2>/dev/null) || CALL_VIEWER=''
+  fi
+  call_n=0
+  while IFS= read -r call; do
+    call_n=$((call_n + 1))
+    view=''
+    if [ "$call_n" -le "$FM_BEARINGS_DECISIONS" ] && command -v gh >/dev/null 2>&1; then
+      view=$(gh_bounded pr view "$(printf '%s' "$call" | jq -r '.url')" \
+        --json state,mergedAt,closedAt,headRefOid,reviews 2>/dev/null) || view=''
+    fi
+    fact=$(printf '%s' "$view" | jq -c --argjson call "$call" --arg viewer "$CALL_VIEWER" '
+      def epoch: if type == "string" then (try fromdateiso8601 catch null) else null end;
+      def minute: if type == "string" and length >= 16 then .[0:16] + "Z" else "" end;
+      select(type == "object" and (.state | type) == "string")
+      | (.headRefOid // "") as $head
+      | ([.reviews[]?
+          | select(.author.login == $viewer and $viewer != ""
+                   and (.state == "APPROVED" or .state == "CHANGES_REQUESTED")
+                   and (.submittedAt | epoch) != null)]
+         | max_by(.submittedAt | epoch)) as $review
+      | {url:$call.url,
+         done:(if .state == "MERGED" then "merged " + (.mergedAt | minute)
+               elif .state == "CLOSED" then "closed " + (.closedAt | minute)
+               elif $call.ship or $review == null or ($call.hold_set | epoch) == null then null
+               elif ($review.commit.oid // "") == $head and $head != ""
+                    and ($review.submittedAt | epoch) >= ($call.hold_set | epoch) then
+                 (if $review.state == "APPROVED" then "approved " else "changes requested " end)
+                 + ($review.submittedAt | minute)
+               else null end)}' 2>/dev/null) || fact=''
+    if [ -z "$fact" ]; then
+      CALL_PR_UNREAD=$((CALL_PR_UNREAD + 1))
+      continue
+    fi
+    CALL_PRS=$(printf '%s' "$CALL_PRS" | jq -c --arg id "$(printf '%s' "$call" | jq -r '.id')" \
+      --argjson fact "$fact" '. + {($id): $fact}') \
+      || { echo "fm-bearings-snapshot: cannot record a captain call's PR state" >&2; exit 1; }
+  done < <(printf '%s' "$CALL_ROWS" | jq -c '.[]')
+fi
+
 # --- projection: canonical snapshot -> fm-bearings.v1 model (JSON) ----------
 BEARINGS_TODAY=${NOW%%T*}
 case "$BEARINGS_TODAY" in
@@ -388,6 +456,8 @@ MODEL=$(printf '%s' "$SNAP" | jq \
   --argjson pr_rows_capped "$PR_ROWS_CAPPED" \
   --argjson pr_rows_min_total "$PR_ROWS_MIN_TOTAL" \
   --argjson return_catchup "$RETURN_CATCHUP" \
+  --argjson call_prs "$CALL_PRS" \
+  --argjson call_pr_unread "$CALL_PR_UNREAD" \
   --argjson candidate_prs "$CANDIDATE_PRS" "$FM_LANDED_JQ_DEFS"'
   def trunc($n): if . == null then null else
     (tostring | gsub("\\s+"; " ") | if (length > $n) then (.[:$n] + "…") else . end) end;
@@ -399,6 +469,8 @@ MODEL=$(printf '%s' "$SNAP" | jq \
   def live_captain_call: .hold_bucket == "live";
   def projected_deferred_hold:
     .hold_bucket != null and .hold_bucket != "live";
+  # A live main-home call whose own PR already settled it (see the live read).
+  def pr_settled: .hold_bucket == "live" and (.pr_done // null) != null;
   def bounded_blocker_note($n):
     ((.unresolved_blocker_ids // []) | map(tostring)) as $ids
     | reduce range(0; $ids | length) as $i
@@ -415,7 +487,8 @@ MODEL=$(printf '%s' "$SNAP" | jq \
             + (if $remaining > 0 then " +\($remaining) more" else "" end))
       end;
   def hold_note:
-    if .hold_bucket == "blocked" then bounded_blocker_note(70)
+    if pr_settled then ("PR " + .pr_done)
+    elif .hold_bucket == "blocked" then bounded_blocker_note(70)
     elif .hold_bucket == "dated" then ("until " + (.hold_until // "-"))
     elif .hold_bucket == "aged" and .hold_age_days != null then
       ("held " + (.hold_age_days | tostring) + "d")
@@ -446,7 +519,10 @@ MODEL=$(printf '%s' "$SNAP" | jq \
        | $groups[]
        | select(length > $i)
        | .[$i]][:$n];
-  ($fields | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(. != ""))) as $fl
+  .backlog.records |= map(
+      if .structured and (($call_prs[.id] // null) != null)
+      then . + {pr_done:$call_prs[.id].done} else . end)
+  | ($fields | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(. != ""))) as $fl
   | (($fl | index("bodies")) != null) as $f_bodies
   | (($fl | index("paths")) != null) as $f_paths
   | (($fl | index("actions")) != null) as $f_actions
@@ -541,10 +617,11 @@ MODEL=$(printf '%s' "$SNAP" | jq \
   | ([ .backlog.records[]
          | . as $record
          | select(.structured and .hold_bucket != null)
-         | select(($all_decisions == 1) or live_captain_call)
+         | select(($all_decisions == 1) or (live_captain_call and (pr_settled | not)))
          | {id,key:.id,verb:"captain-hold",
             summary:hold_summary(.title; .hold_reason),
-            question:(.title + ": " + .hold_reason),owner:"(main)"} ]
+            question:(.title + ": " + .hold_reason),owner:"(main)",
+            pr_url:(.pr_url // null)} ]
      + [ (.secondmate_current.records // [])[] as $m
          | ([ $m.decisions_open[]?
               | select(.source == "backlog" and .verb == "captain-hold")
@@ -552,7 +629,8 @@ MODEL=$(printf '%s' "$SNAP" | jq \
               | {id:($m.id + "/" + .id),key,verb,
                  summary:hold_summary((.summary // .id);
                                       (.reason // "captain decision pending")),
-                 question:(.question // ((.summary // .id) + ": " + (.reason // "captain decision pending"))),owner:$m.id} ]
+                 question:(.question // ((.summary // .id) + ": " + (.reason // "captain decision pending"))),owner:$m.id,
+                 pr_url:(.pr_url // null)} ]
             + [ $m.queued[]?
                 | select($all_decisions == 1 and .hold_kind == "captain")
                 | select(.id as $id
@@ -563,13 +641,15 @@ MODEL=$(printf '%s' "$SNAP" | jq \
                 | {id:($m.id + "/" + .id),key:.id,verb:"captain-hold",
                    summary:hold_summary((.title // .id);
                                         (.hold_reason // "captain decision pending")),
-                   question:(.question // ((.title // .id) + ": " + (.hold_reason // "captain decision pending"))),owner:$m.id} ])[] ]) as $decisions_all
+                   question:(.question // ((.title // .id) + ": " + (.hold_reason // "captain decision pending"))),owner:$m.id,
+                   pr_url:(.pr_url // null)} ])[] ]) as $decisions_all
   | ([ .backlog.records[]
          | . as $record
          | select(.structured and projected_deferred_hold) ]
      + [ (.secondmate_current.records // [])[] | .queued[]?
          | select(.hold_kind == "captain" and projected_deferred_hold) ]
      | length) as $decisions_marked_deferred
+  | ([.backlog.records[] | select(.structured and pr_settled)] | length) as $decisions_pr_settled
   | (if ($return_catchup.pending // false) then
        [{id:"(return-catchup)",
          title:((if ($return_catchup.blockers // 0) > 0 then
@@ -596,7 +676,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
          | select(.structured and
              (.hold_bucket != null or .state == "queued" or
               (.state == "in_flight" and .current_role == "held" and ($working_ids | index($record.id) | not))))
-         | select(.captain_actionable != true)
+         | select(.captain_actionable != true or pr_settled)
          | select((.hold_bucket == null) or ($all_decisions == 0))
          | as_gate("(main)") ]
      + [ (.secondmate_current.records // [])[] as $m
@@ -709,6 +789,8 @@ MODEL=$(printf '%s' "$SNAP" | jq \
         (([($snap.secondmate_current.records // [])[] | select(.parent_event.activity_scan.available == false)] | length) as $n | if $n > 0 then {surface:("secondmate parent activity evidence unavailable for \($n) record(s)"), reveal:"inspect the parent status logs"} else empty end),
         (if $all_decisions == 0 and ($decisions_all | length) > $decisions_n then {surface:("decisions_open showing \($decisions_n) of \($decisions_all | length)"), reveal:"--all-decisions"} else empty end),
         (if $all_decisions == 0 and $decisions_marked_deferred > 0 then {surface:("captain holds bucketed blocked, dated, or aged: \($decisions_marked_deferred)"), reveal:"--all-decisions"} else empty end),
+        (if $all_decisions == 0 and $decisions_pr_settled > 0 then {surface:("captain calls already settled on their PR: \($decisions_pr_settled)"), reveal:"--all-decisions"} else empty end),
+        (if $call_pr_unread > 0 then {surface:("captain calls whose PR state could not be read, kept as owed: \($call_pr_unread)"), reveal:"check that gh is installed and authenticated, then rerun"} else empty end),
         (if $all_queued == 0 and ($gates_all | length) > $gates_n then {surface:("gates showing \($gates_n) of \($gates_all | length)"), reveal:"--all-queued"} else empty end),
         (if $all_reports == 0 and ($reports_all | length) > $reports_n then {surface:("reports showing \($reports_n) of \($reports_all | length)"), reveal:"--all-reports"} else empty end),
         (if $all_recorded_prs == 0 and ($recorded_prs_all | length) > $recorded_prs_n then {surface:("recorded_prs showing \($recorded_prs_n) of \($recorded_prs_all | length)"), reveal:"--all-recorded-prs"} else empty end),

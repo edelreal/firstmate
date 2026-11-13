@@ -1443,6 +1443,100 @@ EOF
   pass "revealed deferred holds display their deferral reason while live calls stay unannotated"
 }
 
+# A captain call carried by a hold whose row names its PR must not keep reading
+# as owed once the captain settled it on GitHub: the default snapshot reads each
+# such PR live and moves a settled call out of Captain's Call into a gate.
+test_captain_call_settled_on_its_pr_leaves_captains_call() {
+  local home fakebin json
+  home=$(make_home pr-settled-call)
+  cat > "$home/data/backlog.md" <<'EOF'
+## In flight
+
+## Queued
+- [ ] approved-call - Mark https://github.com/acme/app/pull/11 approve or request changes (repo: app) (kind: captain) (since 2026-07-11) (hold: the re-review recommends approve) (hold-kind: captain)
+  Captain hold set: 2026-07-11T10:00:00Z
+- [ ] earlier-review-call - Mark https://github.com/acme/app/pull/12 approve or request changes (repo: app) (kind: captain) (since 2026-07-11) (hold: the re-review recommends approve) (hold-kind: captain)
+  Captain hold set: 2026-07-11T10:00:00Z
+- [ ] old-head-call - Mark https://github.com/acme/app/pull/13 approve or request changes (repo: app) (kind: captain) (since 2026-07-11) (hold: new commits need a mark) (hold-kind: captain)
+  Captain hold set: 2026-07-11T10:00:00Z
+- [ ] merged-call - Merge https://github.com/acme/app/pull/14 (repo: app) (kind: ship) (since 2026-07-11) (hold: merge when green) (hold-kind: captain)
+  Captain hold set: 2026-07-11T10:00:00Z
+- [ ] ship-approved-call - Merge https://github.com/acme/app/pull/15 (repo: app) (kind: ship) (since 2026-07-11) (hold: merge when green) (hold-kind: captain)
+  Captain hold set: 2026-07-11T10:00:00Z
+- [ ] unreadable-call - Mark https://github.com/acme/app/pull/16 approve or request changes (repo: app) (kind: captain) (since 2026-07-11) (hold: choose a mark) (hold-kind: captain)
+  Captain hold set: 2026-07-11T10:00:00Z
+- [ ] plain-call - Choose a route (repo: app) (kind: captain) (since 2026-07-11) (hold: north or south) (hold-kind: captain)
+  Captain hold set: 2026-07-11T10:00:00Z
+
+## Done
+EOF
+  fakebin=$(make_fakebin "$home")
+  cat > "$fakebin/gh" <<'SH'
+#!/usr/bin/env bash
+echo "gh $*" >> "$NET_LOG"
+review() {  # <login> <state> <submittedAt> <commit>
+  printf '{"author":{"login":"%s"},"state":"%s","submittedAt":"%s","commit":{"oid":"%s"}}' "$@"
+}
+pr() {  # <state> <mergedAt> <head> <reviews...>
+  local state=$1 merged=$2 head=$3 reviews='' r
+  shift 3
+  for r in "$@"; do reviews=${reviews:+$reviews,}$r; done
+  printf '{"state":"%s","mergedAt":%s,"closedAt":null,"headRefOid":"%s","reviews":[%s]}\n' \
+    "$state" "$merged" "$head" "$reviews"
+}
+case "$1 $2" in
+  "api user") echo captain; exit 0 ;;
+  "pr view") ;;
+  *) exit 1 ;;
+esac
+case "$3" in
+  https://github.com/acme/app/pull/11)
+    # Approved on the current head after the hold; a later comment review does not undo it.
+    pr OPEN null h11 \
+      "$(review captain CHANGES_REQUESTED 2026-07-10T09:00:00Z h10)" \
+      "$(review captain APPROVED 2026-07-11T12:00:00Z h11)" \
+      "$(review captain COMMENTED 2026-07-11T13:00:00Z h11)" \
+      "$(review someone CHANGES_REQUESTED 2026-07-11T14:00:00Z h11)" ;;
+  https://github.com/acme/app/pull/12)
+    pr OPEN null h12 "$(review captain CHANGES_REQUESTED 2026-07-11T09:00:00Z h12)" ;;
+  https://github.com/acme/app/pull/13)
+    pr OPEN null h13 "$(review captain CHANGES_REQUESTED 2026-07-11T12:00:00Z h12)" ;;
+  https://github.com/acme/app/pull/14)
+    pr MERGED '"2026-07-11T13:30:00Z"' h14 ;;
+  https://github.com/acme/app/pull/15)
+    pr OPEN null h15 "$(review captain APPROVED 2026-07-11T12:00:00Z h15)" ;;
+  *) exit 1 ;;
+esac
+SH
+  chmod +x "$fakebin/gh"
+  : > "$home/net.log"
+  json=$(run "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    ([.decisions_open[].id] | sort)
+      == (["earlier-review-call", "old-head-call", "plain-call", "ship-approved-call", "unreadable-call"] | sort)
+  ' >/dev/null || fail "only calls their PR has not settled may stay in Captain's Call: $json"
+  printf '%s' "$json" | jq -e '
+    (.decisions_open | any(.id == "earlier-review-call" and .pr_url == "https://github.com/acme/app/pull/12"))
+      and (.decisions_open | any(.id == "plain-call" and .pr_url == null))
+  ' >/dev/null || fail "a call that names its PR must carry that PR URL for the digest: $json"
+  printf '%s' "$json" | jq -e '
+    (.gates | any(.id == "approved-call" and (.reason | startswith("PR approved 2026-07-11T12:00Z"))))
+      and (.gates | any(.id == "merged-call" and (.reason | startswith("PR merged 2026-07-11T13:30Z"))))
+      and ([.gates[].id] | index("earlier-review-call") | not)
+      and (.omitted | any(.surface == "captain calls already settled on their PR: 2" and .reveal == "--all-decisions"))
+      and (.omitted | any(.surface == "captain calls whose PR state could not be read, kept as owed: 1"))
+  ' >/dev/null || fail "a settled call must surface as a gate stating what its PR shows: $json"
+  [ "$(grep -c '^gh pr view ' "$home/net.log")" = 6 ] \
+    || fail "each live call naming a PR must get exactly one live read: $(cat "$home/net.log")"
+  ! grep -q '^gh pr list ' "$home/net.log" || fail "the default path must not discover PRs: $(cat "$home/net.log")"
+  json=$(run "$home" "$fakebin" --json --all-decisions)
+  printf '%s' "$json" | jq -e '
+    (.decisions_open | any(.id == "approved-call" and (.summary | contains("PR approved 2026-07-11T12:00Z"))))
+      and ([.gates[].id] | index("approved-call") | not)
+  ' >/dev/null || fail "--all-decisions must reveal a settled call with what its PR shows: $json"
+  pass "a captain call its PR already settled leaves Captain's Call and states why"
+}
+
 test_include_prs_is_the_only_fetch_path() {
   local home fakebin json
   home=$(make_home prs); write_fixture "$home"
@@ -3543,6 +3637,7 @@ fm_test_run \
   test_undated_hold_phrasing_and_aging_projection \
   test_blocked_deferred_hold_has_concrete_disclosure \
   test_revealed_deferred_holds_show_their_deferral_reason \
+  test_captain_call_settled_on_its_pr_leaves_captains_call \
   test_pr_repository_cap_and_expansion \
   test_per_repository_pr_cap_is_disclosed \
   test_projection_and_toon_fail_closed

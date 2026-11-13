@@ -47,10 +47,11 @@ For a contribution wake or linked-issue filing, go directly to Contribution foll
    A decision is simply a task held for the captain (`captain-hold-lifecycle`), whatever its kind.
    The canonical snapshot assigns every captain hold exactly one bucket from structured fields only: `blocked` when any blocker is unresolved, else `dated` while `hold_until` is in the future, else `aged` when an undated hold has reached the configured age threshold, else `live`.
    Never use hold-reason or body prose to classify or place a decision.
-   A `live` hold appears in Captain's Call; `blocked`, `dated`, and `aged` holds appear as disclosed Charted Next gates stating their structured reason.
+   A `live` hold appears in Captain's Call; `blocked`, `dated`, and `aged` holds, and a live hold whose own PR the snapshot read shows already settled, appear as disclosed Charted Next gates stating their structured reason.
    Use `--all-decisions` to reveal every captain hold available within the bounded snapshot and remove each revealed gate from Charted Next so the buckets remain exclusive.
    Aging is only a presentation safety net, and re-holding with `--until` remains the durable deferral.
    Do not scrape reports, visual-review artifacts, raw status-event tails, or visible conversation history to supplement current state.
+   Any PR-state claim in the digest - that the captain still owes a review mark, re-request, or merge call, or that a PR was approved, merged, or closed - comes from this invocation's snapshot read live at composition time, never from memory or an earlier digest or recap; a captain-owed PR action with no captain-held task naming its PR is not a Captain's Call item.
    A queued item under `gates` only becomes "next work" when its blocker is gone and its time/date gate has arrived.
    Until then it stays queued with the reason.
    The `(main-inventory)` gate is an action-free integrity warning rather than queued work.
